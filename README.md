@@ -5,34 +5,6 @@
 A full stack developer expertise in MERN stack. I do freelancing, contract jobs for my living 👨🏼‍💻.
 I am available for mentoring, collab, projects and coffee 😉.
 
-<p align="center">
-    <a href="http://github.com/bibekkakati" class="social_icons" target="_blank" />
-    <img width="22" height="22" src="img/github.png" />
-    </a>
-    <a href="http://linkedin.com/in/bibekkakati" class="social_icons" target="_blank" />
-    <img width="22" height="22" src="img/linkedin.png" />
-    </a>
-    <a href="http://facebook.com/bibek.kakati.37" class="social_icons" target="_blank" />
-    <img width="22" height="22" src="img/facebook.png" />
-    </a>
-    <a href="http://instagram.com/bibekkakati" class="social_icons" target="_blank" />
-    <img width="22" height="22" src="img/instagram.png" />
-    </a>
-    <a href="http://twitter.com/kakatibibek" class="social_icons" target="_blank" />
-    <img width="22" height="22" src="img/twitter.png" />
-               </a>
-    <a href="https://blog.bibekkakati.me" class="blog_icon">
-        <img src="img/hashnode.png" alt="" height="22" width="22">
-    </a>
-    <a href="https://dev.to/bibekkakati" class="blog_icon">
-        <img src="https://d2fltix0v2e0sb.cloudfront.net/dev-badge.svg" alt="Bibek's DEV Community Profile"
-                     height="22" width="22">
-    </a>
-    <a href="https://stackoverflow.com/users/11847608/bibek" class="blog_icon">
-        <img src="img/stackoverflow.png" alt="Bibek's stackoverflow Profile" height="20" width="20">
-    </a>
-</p>
-
 <p align="center"><img src="https://github-readme-streak-stats.herokuapp.com/?user=bibekkakati&" alt="bibekkakati" /></p>
 
 <p align="center"> <a href="https://github.com/ryo-ma/github-profile-trophy"><img src="https://github-profile-trophy.vercel.app/?username=bibekkakati&margin-w=5" alt="bibekkakati" /></a> </p>
