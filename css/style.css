@@ -3,19 +3,26 @@
 	src: url(../font/Proxi.woff);
 	font-weight: 400;
 }
+
 html,
 body {
+	scroll-behavior: smooth;
 	margin: 0;
 	padding: 0;
 	font-family: "Proxi";
 	font-size: 15px;
+	-ms-overflow-style: none;
+	scrollbar-width: none;
 }
+
+::-webkit-scrollbar {
+	display: none;
+}
+
 a {
 	color: inherit;
 }
-.email {
-	font-size: 12px;
-}
+
 section.main-container {
 	max-width: 800px;
 	margin: 0 auto;
@@ -51,7 +58,7 @@ section.main-container {
 	left: 0;
 	margin-right: 15px;
 	color: white;
-	background-image: url(../img/pp.jpeg);
+	background-image: url(../img/pic.jpeg);
 	background-size: cover;
 }
 
@@ -167,15 +174,7 @@ section.main-container {
 	text-decoration: none;
 	display: inline-block;
 }
-.block__social__link {
-	position: relative;
-	overflow: hidden;
-	display: inline;
-	line-height: 1;
-	height: auto;
-	padding: 0.3125rem;
-	opacity: 0;
-}
+
 .social_icons {
 	padding: 0 5px;
 }
@@ -187,10 +186,7 @@ section.main-container {
 	text-fill-color: transparent;
 	-webkit-text-fill-color: transparent;
 }
-.btn_email {
-	display: inline-block;
-	color: white;
-}
+
 .skills .skill {
 	border: 1px solid #d4d4d4;
 	padding: 4px 10px;
@@ -198,18 +194,7 @@ section.main-container {
 	display: inline-block;
 	margin: 5px 5px 5px 0;
 }
-.button {
-	border: 1px solid #d4d4d4;
-	background-color: inherit;
-	padding: 4px 10px;
-	border-radius: 15px;
-	display: inline-block;
-	margin: 5px 5px 5px 0;
-	left: auto;
-}
-.button:focus {
-	outline: none;
-}
+
 .copyright {
 	margin-top: 50px;
 	font-size: 15px;
@@ -239,10 +224,6 @@ section.main-container {
 	60% {
 		transform: translateY(40px);
 	}
-}
-.fa {
-	text-decoration: none;
-	color: #eeeded;
 }
 
 .blog_icon {
