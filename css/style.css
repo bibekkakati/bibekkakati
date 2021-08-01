@@ -183,7 +183,6 @@ section.main-container {
 	display: inline;
 	background-clip: text;
 	-webkit-background-clip: text;
-	text-fill-color: transparent;
 	-webkit-text-fill-color: transparent;
 }
 
@@ -202,6 +201,7 @@ section.main-container {
 
 .arrow {
 	text-align: center;
+	cursor: pointer;
 }
 
 .bounce {
