@@ -175,6 +175,12 @@ section.main-container {
 	display: inline-block;
 }
 
+.block__social img {
+	width: 20px;
+	height: 20px;
+	border-radius: 4px;
+}
+
 .social_icons {
 	padding: 0 5px;
 }
