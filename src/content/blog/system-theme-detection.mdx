@@ -1,0 +1,39 @@
+---
+title: "Detect System Color Theme using JavaScript"
+publishedAt: "2022-07-23"
+updatedAt: "2022-07-23"
+author: "Bibek Kakati"
+summary: "Learn how to detect system color theme in web using JavaScript in browser."
+image: ""
+---
+
+Few days back I was wondering how to know if the system theme is dark or light in web using JavaScript and I found a way to detect that.
+
+In this article, I will share the implementation that I used to check the system theme.
+
+*   We will use the method `matchMedia()` provided by the browser's window interface.
+    
+*   `matchMedia` method expects a `mediaQueryString` as a parameter and it will return a `MediaQueryList` object.
+    
+*   `MediaQueryList` object will have a property called `matches` of Boolean data type.
+    
+
+## Code
+
+```javascript
+if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    // Dark Mode
+}
+```
+
+`prefers-color-scheme` is a CSS media feature used to detect the system color theme.
+
+We can also have a listener, if user changes the theme in-between.
+
+```javascript
+window
+   .matchMedia("(prefers-color-scheme: dark)")
+   .addEventListener("change", (event) => {
+       const theme = event.matches ? "dark" : "light";
+   });
+```

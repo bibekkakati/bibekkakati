@@ -1,0 +1,353 @@
+---
+title: "Snake Game using JavaScript"
+publishedAt: "2024-06-24"
+updatedAt: "2024-06-24"
+author: "Bibek Kakati"
+summary: "Let's build the classic Snake game using JavaScript & React."
+image: ""
+---
+
+Hello folks! Welcome to this tutorial on developing the classic Snake game using JavaScript.
+
+I've been working with technology for over six years now, but I've never tried building a game that many of us loved during our childhood. So, this weekend, I decided to create this classic Snake game using web technologies, specifically ReactJS.
+
+Before proceeding further, let me clarify what we are building. As we know, there are various versions of the Snake game available on the internet. What we are building is a game board where the snake will move at a constant speed in the user-selected direction. When it consumes a food ball, its length will increase, and a point will be scored. If the snake's head touches the wall boundary or any part of its own body, the game is over.
+
+Github: [https://github.com/bibekkakati/snake-game-web](https://github.com/bibekkakati/snake-game-web)
+
+Demo: [https://snake-ball.netlify.app](https://snake-ball.netlify.app)
+
+## Game Design
+
+### Components in the game
+
+*   Snake
+    
+*   Food Ball
+    
+*   Game Board
+    
+*   Boundary Walls
+    
+
+### Approach
+
+*   The game board is a 2D matrix with multiple rows and columns.
+    
+*   The intersection of rows and columns forms a cell.
+    
+*   A cell can be identified by its row number and column number.
+    
+*   The snake's body parts will be represented by these cell numbers on the board.
+    
+*   When the snake moves, the cell number (i.e., row and column number) will be updated for the body part cell based on the direction. For example, if the snake is moving to the right, the cell's column number will be incremented by 1.
+    
+*   Before rendering the snake's position after each movement, we also need to perform these steps:
+    
+    *   Check if this movement results in any collision with the boundary wall or its own body. If there is a collision, stop the game and show "game over"; otherwise, continue.
+        
+    *   Check if the snake's head cell number is the same as the food ball's cell number. If they match, update the score and place a new food ball on the board.
+        
+
+## Implementation
+
+We are writing all the logic and UI code in a single file, `App.jsx`, and using `index.css` for the styling. In this implementation, we will not be discussing the styling.
+
+### Constants
+
+First, we will declare the constants before the component function definition.
+
+```javascript
+const COLs = 48; // Number of columns on board
+const ROWs = 48; // Number of rows on board
+
+// Default length of snake i.e, it will consume 10 cell by default
+const DEFAULT_LENGTH = 10;
+
+// Declaring directions as symbol for equality checks
+const UP = Symbol("up");
+const DOWN = Symbol("down");
+const RIGHT = Symbol("right");
+const LEFT = Symbol("left");
+```
+
+### State and Reference
+
+Declare the reference and state variables.
+
+```javascript
+const timer = useRef(null);
+const grid = useRef(Array(ROWs).fill(Array(COLs).fill("")));
+const snakeCoordinates = useRef([]);
+const direction = useRef(RIGHT);
+const snakeCoordinatesMap = useRef(new Set());
+const foodCoords = useRef({
+    row: -1,
+    col: -1,
+});
+const [points, setPoints] = useState(0);
+const [gameOver, setGameOver] = useState(false);
+const [isPlaying, setPlaying] = useState(0);
+```
+
+*   The `timer` variable stores the instance of `setInterval` that we use to automate the snake's movement. This instance will be used to clear the interval when the game is over.
+    
+*   The `grid` variable stores the empty 2D array used to render the game board.
+    
+*   The `snakeCoordinates` variable stores the indexes of the snake's body parts, i.e., cell numbers. The `0th` index value is the snake's tail, and the last value is the snake's head.
+    
+    *   The value of snake coordinates will look like `{ row: [Number], col: [Number], isHead: [Boolean] }`.
+        
+*   The `direction` variable stores the user-selected direction. This value will be the same as the declared constant direction symbols.
+    
+*   The `snakeCoordinatesMap` variable stores the set of snake body parts, i.e., cell numbers. This helps in the render method to check which part of the board (grid) we need to render a snake body part on. The variable name includes the word `map`, but the value is of type `Set`.
+    
+*   The `foodCoords` variable stores the position of the food ball's cell number.
+    
+*   The `points`, `gameOver`, and `isPlaying` are state variables used to store the score, game over status, and game play status, respectively.
+    
+
+> You might have noticed that `isPlaying` is a number, not a boolean. This is due to a specific bypass mechanism we will discuss in the coming sections.
+
+### Functionality
+
+Let's discuss the implementation of snake's body movement along with collision check and food ball consumption.
+
+We are writing a function `moveSnake` to handle the snake movement logic.
+
+```javascript
+const moveSnake = () => {
+        if (gameOver) return;
+
+        setPlaying((s) => s + 1);
+
+        const coords = snakeCoordinates.current;
+        const snakeTail = coords[0];
+        const snakeHead = coords.pop();
+        const curr_direction = direction.current;
+
+        // Check for food ball consumption
+        const foodConsumed =
+            snakeHead.row === foodCoords.current.row &&
+            snakeHead.col === foodCoords.current.col;
+
+        // Update body coords based on direction and its position
+        coords.forEach((_, idx) => {
+            // Replace last cell with snake head coords [last is the cell after snake head]
+            if (idx === coords.length - 1) {
+                coords[idx] = { ...snakeHead };
+                coords[idx].isHead = false;
+                return;
+            }
+
+            // Replace current cell coords with next cell coords
+            coords[idx] = coords[idx + 1];
+        });
+
+        // Update snake head coords based on direction
+        switch (curr_direction) {
+            case UP:
+                snakeHead.row -= 1;
+                break;
+            case DOWN:
+                snakeHead.row += 1;
+                break;
+            case RIGHT:
+                snakeHead.col += 1;
+                break;
+            case LEFT:
+                snakeHead.col -= 1;
+                break;
+        }
+
+        // If food ball is consumed, update points and new position of food
+        if (foodConsumed) {
+            setPoints((points) => points + 10);
+            populateFoodBall();
+        }
+
+        // If there is no collision for the movement, continue the game
+        const collided = collisionCheck(snakeHead);
+        if (collided) {
+            stopGame();
+            return;
+        }
+
+        // Create new coords with new snake head
+        coords.push(snakeHead);
+        snakeCoordinates.current = foodConsumed
+            ? [snakeTail, ...coords]
+            : coords;
+        syncSnakeCoordinatesMap(); // Function to create a set from snake body coordinates
+    };
+```
+
+*   The first check ensures that if the game is over, we don't need to move the snake. It's just an extra precaution.
+    
+*   Next, we derive the current snake coordinates, the snake tail position, and the snake head position.
+    
+*   We then check if the food ball is consumed, meaning the snake head position should match the food ball position.
+    
+*   After that, we iterate over the body parts, excluding the snake head, to determine the new coordinates of the snake body.
+    
+    *   The position of each snake body part depends on the position of the next part, as the snake's body parts move in the same path as the head. So, we replace the current body part coordinates with the next body part's coordinates.
+        
+    *   If the body part is the last one, i.e., the neck, it will take the coordinates of the current snake head.
+        
+*   We then update the new snake head position based on the selected direction.
+    
+*   Finally, we check for food consumption and collisions and update the new snake coordinates if there is no collision.
+    
+
+Let's talk about how we populate the food ball.
+
+```javascript
+    const populateFoodBall = async () => {
+        const row = Math.floor(Math.random() * ROWs);
+        const col = Math.floor(Math.random() * COLs);
+
+        foodCoords.current = {
+            row,
+            col,
+        };
+    };
+```
+
+We generate a random row and column number based on our constants and set them in the reference variable `foodCoords`.
+
+Now, let's discuss the collision check function.
+
+```javascript
+    const collisionCheck = (snakeHead) => {
+        // Check wall collision
+        if (
+            snakeHead.col >= COLs ||
+            snakeHead.row >= ROWs ||
+            snakeHead.col < 0 ||
+            snakeHead.row < 0
+        ) {
+            return true;
+        }
+
+        // Check body collision
+        const coordsKey = `${snakeHead.row}:${snakeHead.col}`;
+        if (snakeCoordinatesMap.current.has(coordsKey)) {
+            return true;
+        }
+    };
+```
+
+The function will receive the new snake head coordinates as a parameter.
+
+First, we check for boundary collisions. If the new snake head's coordinates are greater than the respective constants or less than 0, it means the snake head is going out of range, which is a collision.
+
+Next, we check for self-collision, meaning the snake head colliding with its own body. We do this by checking if the snake head coordinates are already present in the snake coordinates map.
+
+Then we have the `startGame` and `stopGame` functions to control the gameplay.
+
+```javascript
+    const startGame = async () => {
+        const interval = setInterval(() => {
+            moveSnake();
+        }, 100);
+
+        timer.current = interval;
+    };
+
+    const stopGame = async () => {
+        setGameOver(true);
+        setPlaying(false);
+        if (timer.current) {
+            clearInterval(timer.current);
+        }
+    };
+```
+
+`startGame` triggers a `setInterval` with a `100ms` interval. After each interval, the `moveSnake` method is called.
+
+`stopGame` sets the game over state, updates the gameplay status, and clears the interval instance.
+
+Then, we have the render method.
+
+```javascript
+    const getCell = useCallback(
+        (row_idx, col_idx) => {
+            const coords = `${row_idx}:${col_idx}`;
+            const foodPos = `${foodCoords.current.row}:${foodCoords.current.col}`;
+            const head =
+                snakeCoordinates.current[snakeCoordinates.current.length - 1];
+            const headPos = `${head?.row}:${head?.col}`;
+
+            const isFood = coords === foodPos;
+            const isSnakeBody = snakeCoordinatesMap.current.has(coords);
+            const isHead = headPos === coords;
+
+            let className = "cell";
+            if (isFood) {
+                className += " food";
+            }
+            if (isSnakeBody) {
+                className += " body";
+            }
+            if (isHead) {
+                className += " head";
+            }
+
+            return <div key={col_idx} className={className}></div>;
+        },
+        [isPlaying]
+    );
+
+    return (
+        <div className="app-container">
+            {gameOver ? (
+                <p className="game-over">GAME OVER</p>
+            ) : (
+                <button onClick={isPlaying ? stopGame : startGame}>
+                    {isPlaying ? "STOP" : "START"} GAME
+                </button>
+            )}
+            <div className="board">
+                {grid.current?.map((row, row_idx) => (
+                    <div key={row_idx} className="row">
+                        {row.map((_, col_idx) => getCell(row_idx, col_idx))}
+                    </div>
+                ))}
+            </div>
+            <p className="score">SCORE {points}</p>
+        </div>
+    );
+```
+
+The `getCell` method checks if the cell is empty, part of the snake's body, or food, and updates the CSS class name accordingly.
+
+We use the `useCallback` hook in the `getCell` method, with `isPlaying` as a dependency. This `isPlaying` variable is a number that increases by 1 with each snake movement.
+
+Here's why we did this:
+
+1.  **Stale State Issue:**
+    
+    *   Initially, many variables were state variables.
+        
+    *   The snake movement logic didn't work well because `setInterval` was calling `moveSnake` but the state values inside `moveSnake` weren't updating properly.
+        
+2.  **Switch to Reference Variables:**
+    
+    *   To fix this, we changed those state variables to reference variables.
+        
+    *   This allowed `moveSnake` to access the latest values.
+        
+3.  **Re-rendering Problem:**
+    
+    *   Reference variables don't trigger re-renders when they change.
+        
+    *   To solve this, we used the `isPlaying` state variable which increments by 1 with each snake movement.
+        
+    *   This increment ensures the `getCell` method has access to the updated reference variable and the component re-renders correctly.
+
+
+Github: [https://github.com/bibekkakati/snake-game-web](https://github.com/bibekkakati/snake-game-web)
+
+Demo: [https://snake-ball.netlify.app](https://snake-ball.netlify.app)
+
+> Works best on desktop web.
