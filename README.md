@@ -7,4 +7,4 @@
 
 📌 LeetCode: [Visit Profile](https://leetcode.com/u/bibekkakati/)
 
-🌐 Website: [bibekkakati.me](https://bibekkakati.me)
+🌐 Website: [bibekkakati.com](https://bibekkakati.com)
