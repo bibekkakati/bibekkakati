@@ -15,6 +15,8 @@ interface Pagination {
     totalPages: number;
     hasNextPage: boolean;
     hasPreviousPage: boolean;
+    prevUrl?: string;
+    nextUrl?: string;
 }
 
 interface BlogListProps {
@@ -99,9 +101,9 @@ export default function BlogList({
                                     {pagination.totalPages}
                                 </div>
                                 <div className="flex gap-2 sm:justify-end">
-                                    {pagination.hasPreviousPage ? (
+                                    {pagination.hasPreviousPage && pagination.prevUrl ? (
                                         <a
-                                            href={`/blog?page=${pagination.page - 1}`}
+                                            href={pagination.prevUrl}
                                             className="h-8 w-fit px-2 flex items-center justify-center text-sm border border-border rounded-lg hover:bg-accent/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                         >
                                             Previous
@@ -111,9 +113,9 @@ export default function BlogList({
                                             Previous
                                         </span>
                                     )}
-                                    {pagination.hasNextPage ? (
+                                    {pagination.hasNextPage && pagination.nextUrl ? (
                                         <a
-                                            href={`/blog?page=${pagination.page + 1}`}
+                                            href={pagination.nextUrl}
                                             className="h-8 w-fit px-2 flex items-center justify-center text-sm border border-border rounded-lg hover:bg-accent/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                         >
                                             Next

@@ -44,7 +44,7 @@ export const DATA = {
     description:
         "Software Engineer who enjoys taking ownership, moving fast, and building scalable products from zero to growth.",
     summary: [
-        "I'm a Software Engineer with 5+ years of experience building scalable [backend systems and full-stack applications](#work). I've worked across logistics, travel, and AI, with experience in distributed systems, cloud infrastructure, and system design.",
+        "I'm a Software Engineer with 5+ years of experience building scalable [backend systems and full-stack AI applications](#work). I've worked across logistics, travel, and AI, with experience in distributed systems, cloud infrastructure, and system design.",
         "Most recently, I was a [Founding Engineer](/#work) at a travel-tech startup, where I owned large parts of the engineering stack from architecture to product delivery. I enjoy solving complex backend problems and building reliable systems that scale.",
     ],
     avatarUrl: "/picofme.jpeg",
@@ -144,15 +144,15 @@ export const DATA = {
             href: "https://furbago.com",
             badges: ["Founder"],
             location: "Delhi, India",
-            title: "Founding Engineer",
+            title: "Founder & Software Engineer",
             logoUrl: "/logos/furbago-logo.jpeg",
             start: "March 2024",
             end: "May 2026",
             description: [
-                "Architected and developed a travel marketplace platform from scratch, enabling onboarding andmanagement of multiple stakeholders listings.",
-                "Built internal operations and content moderation systems, reducing manual processing eﬀort by 60% through workflow automation.",
-                "Optimized backend performance through query tuning and Redis caching, reducing API response times by 40%.",
-                "Owned cloud infrastructure, CI/CD pipelines, and deployment workflows on DigitalOcean; integrated LLM-powered content generation capabilities into the platform.",
+                "Developed the entire technology stack end-to-end, architecting and operating the marketplace, admin portal, supplier portal, and core backend using Node.js, MongoDB, Redis, Cloudflare, and Gemini.",
+                "Engineered a high-read, cache-optimized backend supporting listings, availability, pricing, and booking workflows, reducing API response times by 50% while operating efficiently on lean infrastructure.",
+                "Orchestrated AI-driven listing automation for document parsing, content generation, pricing extraction, validation, and SEO; reduced average listing processing time from 2 hours to 30 minutes while retaining human verification.",
+                "Designed a unified payment processing system supporting multiple gateways, partial payments, and refunds, handling the core payment lifecycle across the marketplace.",
             ],
         },
         {
@@ -165,12 +165,11 @@ export const DATA = {
             start: "September 2021",
             end: "October 2023",
             description: [
-                "Designed and developed backend services for logistics execution, contract management, ePOD, and trip management modules supporting enterprise customers.",
-                "Architected and implemented a centralized authentication and SSO platform used across multiple internal applications and stakeholder groups.",
-                "Designed fault-tolerant distributed workflows using Temporal for large-scale bulk data ingestion and processing, enabling reliable execution, retries, and recovery mechanisms.",
-                "Optimized backend systems and database performance, supporting 4x growth in platform transaction volume during tenure.",
-                "Integrated the platform with enterprise ERP systems and third-party services to automate logistics and operational workflows.",
-                "Authored technical documentation and led code reviews for backend systems, mentoring junior engineers through design discussions and engineering best practices.",
+                "Owned backend engineering across logistics execution, contract management, ePOD, and trip management, delivering production systems for enterprise customers and working closely with product and business teams.",
+                "Architected and delivered a centralized authentication and SSO platform used across multiple internal applications and stakeholder groups.",
+                "Designed fault-tolerant distributed workflows with Temporal for large-scale bulk data ingestion, with reliable retries, recovery, and failure handling; backend optimizations supported 400% growth in platform transaction volume during my tenure.",
+                "Led a cross-functional engineering team of around 10 members across frontend, backend, database, and QA, driving technical design, code reviews, debugging, production support, and delivery.",
+                "Partnered with business analysts and enterprise stakeholders on client demos, requirements, ERP integrations, and third-party integrations, translating business needs into production-ready systems.",
             ],
         },
         {
@@ -251,18 +250,21 @@ export const DATA = {
     ],
     projects: [
         {
-            title: "AI Financial & Compliance Intelligence Platform",
+            title: "Clause AI - Rental Agreement Intelligence Platform",
             active: true,
             description: [
-                "Built an AI-powered financial and compliance intelligence platform using agentic workflows to automate financial tracking and extract insights from contracts and compliance documents.",
-                "Developed multi-agent systems for risk detection, clause validation, renewal tracking, and document summarization; showcased at the India AI Impact Expo.",
+                "Built a multi-agent AI backend using Express.js, TypeScript, Mastra, Gemini, and PostgreSQL(with pgvector) to extract contract terms, summarize agreements, and identify risky clauses with evidence-backed explanations.",
+                "Designed an asynchronous document-processing pipeline with BullMQ, Redis, and Cloudflare R2, with idempotent agent stages, persisted intermediate state, retries, and fault isolation.",
+                "Implemented a RAG-based document query/chat system with semantic retrieval, tool-based agent orchestration, and grounded responses constrained to the source agreement.",
             ],
             technologies: [
-                "Gemini API",
+                "Mastra",
+                "Gemini",
+                "PostgreSQL",
                 "RAG",
-                "Vector Database",
-                "MongoDB",
-                "Agentic AI",
+                "AI Agent",
+                "AI Workflows",
+                "Redis",
             ],
             links: [
                 {
@@ -272,7 +274,36 @@ export const DATA = {
                 },
                 {
                     type: "Source",
+                    href: "https://github.com/bibekkakati/clause.ai",
+                    icon: <Icons.github className="size-3" />,
+                },
+            ],
+        },
+        {
+            title: "Propio AI - Financial Management Platform for Hotels",
+            active: true,
+            description: [
+                "Architected a financial management platform using Express.js, React.js, MongoDB, and Gemini to help short-term rental operators organize expenses, invoices, and receipts.",
+                "Automated invoice and receipt processing through AI-powered OCR, extracting financial fields, categorizing expenses, and storing structured records with minimal manual entry.",
+                "Enabled period-wise expense and revenue analysis with accountant-ready exports, making financial reconciliation and GST filing preparation significantly easier.",
+                "Showcased at the India AI Impact Expo, Delhi.",
+            ],
+            technologies: [
+                "Gemini",
+                "RAG",
+                "Vector Database",
+                "MongoDB",
+                "AI Agents",
+            ],
+            links: [
+                {
+                    type: "Website",
                     href: "",
+                    icon: <Icons.globe className="size-3" />,
+                },
+                {
+                    type: "Source",
+                    href: "https://github.com/bibekkakati/propio.ai",
                     icon: <Icons.github className="size-3" />,
                 },
             ],

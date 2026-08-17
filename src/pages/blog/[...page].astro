@@ -1,0 +1,49 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import BlogList from "@/components/BlogList";
+import { getCollection } from "astro:content";
+import { calculateReadingTime, formatDate } from "@/lib/utils";
+import { CONFIG } from "@/data/config";
+import type { GetStaticPaths } from "astro";
+
+export const getStaticPaths = (async ({ paginate }) => {
+    const allPosts = await getCollection("blog");
+    const sortedPosts = [...allPosts].sort((a, b) => {
+        if (new Date(a.data.publishedAt) > new Date(b.data.publishedAt)) return -1;
+        return 1;
+    });
+    
+    return paginate(sortedPosts, { pageSize: CONFIG.blog.postsPerPage });
+}) satisfies GetStaticPaths;
+
+const { page } = Astro.props;
+
+const posts = page.data.map((post) => ({
+    id: post.id,
+    title: post.data.title,
+    publishedAt: formatDate(post.data.publishedAt),
+    readingTime: calculateReadingTime(post.body || ""),
+}));
+
+const pagination = {
+    page: page.currentPage,
+    totalPages: page.lastPage,
+    hasNextPage: !!page.url.next,
+    hasPreviousPage: !!page.url.prev,
+    prevUrl: page.url.prev,
+    nextUrl: page.url.next,
+};
+---
+
+<Layout
+    title="Blog"
+    description="Read about technology, implementations, projects and my journey."
+>
+    <BlogList
+        client:load
+        posts={posts}
+        allPostsCount={page.total}
+        pagination={pagination}
+        pageSize={page.size}
+    />
+</Layout>
