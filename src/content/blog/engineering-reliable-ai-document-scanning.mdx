@@ -1,0 +1,148 @@
+---
+title: "Engineering Reliable AI Document Scanning: Prompts and Schemas"
+publishedAt: "2026-02-24"
+updatedAt: "2026-02-24"
+author: "Bibek Kakati"
+summary: "How Propio AI turns messy receipts and booking confirmations into structured financial records using Gemini, strict JSON schemas, and multi-model fallback strategies."
+image: ""
+---
+
+Managing short-term rentals and homestays usually involves a chaotic mix of spreadsheets, WhatsApp messages, and scattered paper receipts. **[Propio](https://github.com/bibekkakati/propio.ai)** was built to replace that chaos with a purpose-built financial tracking platform.
+
+One of the most powerful features in Propio is **Smart Scan** — an AI-powered OCR system that allows property managers to drop a receipt, invoice, or booking confirmation into the app and have all the relevant financial fields extracted and categorized automatically.
+
+But building an AI that reads documents is easy; building one that extracts data _reliably enough for financial records_ is incredibly difficult. If your AI hallucinates a tax amount or miscategorizes an expense, you haven't saved the user time—you've created a data integrity nightmare.
+
+Here is a deep dive into how Propio's document scanning architecture works, focusing on the critical importance of system prompts, output structuring, and fallback mechanisms.
+
+## The Asynchronous Pipeline
+
+Document processing is slow. Relying on a synchronous HTTP request to wait for an LLM to parse a multi-page PDF is a recipe for browser timeouts and frozen UIs.
+
+Propio handles this asynchronously:
+
+1. **Stream to Storage**: The user uploads a file, which is streamed directly to Cloudflare R2.
+2. **Task Creation**: An `AgentTask` is created in MongoDB with a `PENDING` status, and the Task ID is returned to the client immediately.
+3. **Background Processing**: The server kicks off the OCR processing in the background (`asyncOcrAgentProcess`).
+4. **Client Polling**: The frontend polls the Task ID. The user sees a real-time progress stepper. Once the status hits `COMPLETED`, the extracted data pre-fills the expense or booking form for a quick human review.
+
+This "fire-and-forget with polling" approach ensures the UI remains snappy regardless of how long the AI takes to "think."
+
+## Taming the AI: Schemas Over Free-Text
+
+The biggest mistake when using LLMs for data extraction is asking for free-text or loosely formatted JSON. LLMs are eager to please and will often include conversational filler (e.g., _"Here is the extracted data:"_), which breaks standard JSON parsers.
+
+Propio enforces strict structured outputs at the API level using the `@google/genai` SDK's schema definition.
+
+```javascript title="ocr.agent.js"
+const config = {
+    responseMimeType: "application/json",
+    responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+            recordDate: {
+                type: Type.STRING,
+                description: "This is receipt/invoice/billing date",
+            },
+            category: {
+                type: Type.STRING,
+                enum: ExpenseCategories, // e.g., ["Electricity", "Water", "Maintenance"...]
+            },
+            amount: {
+                type: Type.NUMBER,
+            },
+            paymentMode: {
+                type: Type.STRING,
+                enum: ExpensePaymentOptions,
+            },
+            vendorName: {
+                type: Type.STRING,
+            },
+            error: {
+                type: Type.STRING,
+                nullable: true,
+            },
+        },
+    },
+    systemInstruction: [{ text: expenseParsingSystemInstruction }],
+};
+```
+
+By enforcing `responseMimeType: "application/json"` and providing a strict OpenAPI-style schema, we guarantee that the output will be parseable JSON matching our exact database requirements. We even pass our application's ENUMs (`ExpenseCategories`) directly into the schema to ensure the AI categorizes the expense into a bucket our frontend actually supports.
+
+## The Art of the System Prompt
+
+Even with a forced JSON schema, the AI needs strict behavioral boundaries. Propio's `expenseParsingSystemInstruction` acts as a rigid set of rules designed to prevent hallucination and enforce normalization.
+
+### 1. The "Do Not Guess" Rule
+
+Financial data must be exact. The prompt explicitly states:
+
+```bash
+"Extract only data that is explicitly visible in the document. Never guess, infer, or fabricate values. If a field is missing or unclear, return null for that field."
+```
+
+### 2. Normalization Rules
+
+Raw OCR data is messy. Dates come in various formats (MM/DD/YY, DD-MMM-YYYY), and amounts often include currency symbols or commas. We instruct the model to normalize this on the fly:
+
+- `recordDate` → `YYYY-MM-DD` format.
+- `amount` → numeric value only (remove currency symbols, commas, text).
+
+### 3. Graceful Rejection
+
+What happens if a user uploads a photo of their cat instead of a receipt? The agent needs an escape hatch.
+
+```bash
+FAILURE CONDITIONS: If the file is corrupted, blank, unsupported, not readable, or not a financial document, return only: { 'error': 'Seems like file is not a valid document' }
+```
+
+Because our schema includes a nullable `error` string, the AI can legally fulfill the JSON requirement while still rejecting the document.
+
+## High Availability: The Multi-Model Cascade
+
+AI APIs go down. They get rate-limited. Models get overloaded. If your feature relies on a single model endpoint, your feature _will_ break.
+
+To ensure near-zero downtime for the Smart Scan feature, Propio implements a multi-model cascade with exponential backoff.
+
+```javascript title="ai.client.js"
+const Models = ["gemma-4-31b-it", "gemini-2.5-flash-lite"];
+
+const generateContent = async (models, config, contents) => {
+    const delayMs = 1000 * 2;
+    const maxRetryPerModel = 2;
+
+    for (const model of models) {
+        for (let attempt = 1; attempt <= maxRetryPerModel; attempt++) {
+            try {
+                const response = await ai.models.generateContent({
+                    model,
+                    config,
+                    contents,
+                });
+                if (response.text) return response;
+            } catch (error) {
+                // If it's a 429 Rate Limit, break and try the next model immediately
+                if (error instanceof ApiError && error.code === 429) {
+                    break;
+                }
+
+                // Otherwise, wait with exponential backoff and retry this model
+                if (attempt <= maxRetryPerModel) {
+                    const waitTime = delayMs * Math.pow(2, attempt - 1);
+                    await sleep(waitTime);
+                }
+            }
+        }
+    }
+    throw new Error("Model API call error. All models failed.");
+};
+```
+
+This wrapper iterates through an array of preferred models. If the primary model fails due to a standard error, it retries with exponential backoff. Crucially, if it receives a `429 Too Many Requests` error, it immediately aborts retrying the current model and seamlessly cascades to the next fallback model. The user rarely notices a delay.
+
+## Conclusion
+
+Building reliable AI features isn't just about sending a prompt to an endpoint. It requires treating the AI as an unreliable function that needs strict guardrails.
+
+By combining **asynchronous processing** for UX, **strict JSON schemas** for structural integrity, **rigid system instructions** for data accuracy, and **multi-model cascading** for resilience, Propio turns AI document scanning from a novelty into a dependable tool for property managers.

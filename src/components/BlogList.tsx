@@ -53,7 +53,8 @@ export default function BlogList({
                         <div className="flex flex-col gap-5">
                             {posts.map((post, id) => {
                                 const indexNumber =
-                                    (pagination.page - 1) * pageSize + id + 1;
+                                    allPostsCount -
+                                    ((pagination.page - 1) * pageSize + id);
                                 return (
                                     <BlurFade
                                         delay={BLUR_FADE_DELAY * 3 + id * 0.05}
@@ -101,7 +102,8 @@ export default function BlogList({
                                     {pagination.totalPages}
                                 </div>
                                 <div className="flex gap-2 sm:justify-end">
-                                    {pagination.hasPreviousPage && pagination.prevUrl ? (
+                                    {pagination.hasPreviousPage &&
+                                    pagination.prevUrl ? (
                                         <a
                                             href={pagination.prevUrl}
                                             className="h-8 w-fit px-2 flex items-center justify-center text-sm border border-border rounded-lg hover:bg-accent/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -113,7 +115,8 @@ export default function BlogList({
                                             Previous
                                         </span>
                                     )}
-                                    {pagination.hasNextPage && pagination.nextUrl ? (
+                                    {pagination.hasNextPage &&
+                                    pagination.nextUrl ? (
                                         <a
                                             href={pagination.nextUrl}
                                             className="h-8 w-fit px-2 flex items-center justify-center text-sm border border-border rounded-lg hover:bg-accent/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"

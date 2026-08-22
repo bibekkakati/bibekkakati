@@ -1,0 +1,1306 @@
+---
+title: "9 RAG Techniques That Actually Improve Retrieval Quality"
+publishedAt: "2026-08-22"
+updatedAt: "2026-08-22"
+author: "Bibek Kakati"
+summary: "A practical guide to nine techniques for improving Retrieval-Augmented Generation systems, from reranking and hybrid search to HyDE, Self-RAG, and CRAG."
+image: ""
+---
+
+Retrieval-Augmented Generation (RAG) is often described as a simple pipeline:
+
+> Query → Retrieve documents → Send context to an LLM → Generate answer
+
+In production, however, retrieval is rarely that simple.
+
+The retriever can return irrelevant documents. Important information may be buried in the middle of a document. A query may be too vague for semantic search. Retrieved chunks may lose their surrounding context. And sometimes the model does not need retrieval at all.
+
+The quality of a RAG system therefore depends heavily on **how information is retrieved, filtered, ranked, compressed, and presented to the model**.
+
+This guide covers nine techniques that address different parts of the RAG pipeline:
+
+1. [Reranking](#1-reranking)
+2. [Hybrid Search](#2-hybrid-search)
+3. [Chunking Strategies](#3-chunking-strategies)
+4. [Multi-Query Retrieval](#4-multi-query-retrieval)
+5. [Parent Document Retrieval](#5-parent-document-retrieval)
+6. [Context Compression](#6-context-compression)
+7. [HyDE](#7-hyde)
+8. [Self-RAG](#8-self-rag)
+9. [CRAG](#9-crag)
+
+---
+
+## 1. Reranking
+
+> Retrieve candidates. Reranking finds the best.
+
+A vector database may search through hundreds or thousands of documents and return the top 20 candidate chunks.
+
+But the first result from vector search is not necessarily the best result.
+
+For example, suppose the correct answer is ranked at position #19.
+
+If the application only sends the top 3–5 chunks to the LLM, the correct information never reaches the model.
+
+```bash
+                100 Pages
+                    ↓
+              Vector Search
+                    ↓
+           20 Candidate Chunks
+                    │
+        ┌───────────┴───────────┐
+        ↓                       ↓
+  Without Reranking       With Reranking
+        ↓                       ↓
+  Top 3–5 Chunks             Reranker
+        ↓                       ↓
+        │                 Top 5 Relevant
+        │                     Chunks
+        ↓                       ↓
+        ↓                       ↓
+       LLM                     LLM
+```
+
+Without reranking, the most relevant chunk might be ranked #19 and never reach the model.
+
+With reranking, a reranker evaluates the retrieved candidates using both the query and the content of each chunk, promoting the most relevant results to the top.
+
+The reranker can move a previously low-ranked but highly relevant chunk to the top.
+
+### What does a reranker do?
+
+A reranker essentially asks:
+
+> Which of these retrieved chunks actually answers the user's question best?
+
+Unlike basic vector similarity, a reranker can inspect the relationship between the entire query and the retrieved document.
+
+This helps it:
+
+- Understand context better
+- Find hidden relevance
+- Filter out noise
+- Improve the quality of the final answer
+
+### Types of rerankers
+
+Common approaches include:
+
+- **Cross-Encoder**
+
+    - High accuracy
+    - Slower
+
+- **Bi-Encoder + Rerank Model**
+
+    - Balanced performance
+
+- **LLM-based Reranker**
+
+    - Potentially highest quality
+    - More expensive
+
+### Example
+
+Suppose a developer asks:
+
+> How can I make a Node.js API handle thousands of simultaneous connections?
+
+A basic vector search might initially return chunks about HTTP status codes, API authentication, or general Node.js syntax.
+
+A reranker can compare each candidate directly against the question and prioritize content discussing connection handling, asynchronous I/O, event loops, connection pooling, and horizontal scaling.
+
+### Key takeaway
+
+> Retrieve more. Rerank intelligently. Let the LLM see the best context, not merely the first context.
+
+---
+
+## 2. Hybrid Search
+
+> Meaning + Keywords = Better Retrieval
+
+Semantic vector search and keyword search solve different problems.
+
+Vector search understands **meaning**.
+
+Keyword search understands **exact words**.
+
+Using only one can cause important documents to be missed.
+
+### The problem
+
+Consider this query:
+
+```bash
+"Redis connection timeout"
+```
+
+A semantic search might return:
+
+1. Diagnosing cache connection failures
+2. Distributed cache troubleshooting
+3. Network latency in application infrastructure
+
+These documents may be semantically related, but the exact phrase `Redis connection timeout` might not appear.
+
+A keyword search such as BM25 can find:
+
+1. Redis connection timeout configuration
+2. Fixing Redis client timeout errors
+3. Redis socket timeout settings
+
+But keyword search may fail when the document uses different terminology.
+
+### Hybrid Search
+
+Hybrid search combines both approaches:
+
+```bash
+                User Query
+                    │
+          ┌─────────┴─────────┐
+          ↓                   ↓
+    Vector Search        Keyword Search
+     (Semantic)              (BM25)
+          │                   │
+          └─────────┬─────────┘
+                    ↓
+              Merge & Rank
+                    ↓
+              Final Results
+```
+
+The results from both searches are combined and ranked.
+
+### Common ranking methods
+
+Popular approaches include:
+
+- Reciprocal Rank Fusion (RRF)
+- Weighted score combination
+- Relative score fusion
+- Rank-based fusion
+
+### Why hybrid search works
+
+Vector search is good at understanding intent:
+
+```bash
+"cache performance troubleshooting"
+```
+
+Keyword search is good at exact terms:
+
+```bash
+"Redis MISCONF"
+```
+
+A production search system often needs both.
+
+### When hybrid search is useful
+
+Hybrid search is particularly useful for:
+
+- Technical documentation
+- Spelling variations
+- Abbreviations
+- Exact technical terms
+- Natural language queries
+- Systems requiring both high recall and high precision
+
+### Key takeaway
+
+> Don't choose between meaning and keywords. Use both.
+
+---
+
+## 3. Chunking Strategies
+
+> Good chunks → Better Retrieval → Better Answers
+
+Chunking is one of the most important decisions in a RAG system.
+
+Documents are usually too large to embed and retrieve as a single unit, so they must be divided into smaller pieces.
+
+But chunk size matters.
+
+### Why chunking matters
+
+If a chunk is too large:
+
+- Important information can get buried
+- Retrieval becomes less precise
+- More irrelevant context reaches the LLM
+
+If a chunk is too small:
+
+- Context is lost
+- More noise can be introduced
+- Individual chunks may not contain enough information to answer a question
+
+The goal is:
+
+> Keep chunks as small as possible for precision, but as large as necessary for completeness.
+
+### 1. Fixed-Size Chunking
+
+The document is divided into chunks of a fixed number of tokens.
+
+For example:
+
+```bash
+Document
+   ↓
+400 tokens
+   ↓
+400 tokens
+   ↓
+400 tokens
+   ↓
+...
+```
+
+An overlap can be added between chunks.
+
+#### Advantages
+
+- Simple
+- Fast
+- Works reasonably well for general documents
+
+#### Disadvantages
+
+- Can split sentences or concepts in the middle
+
+---
+
+### 2. Sentence-Based Chunking
+
+Instead of splitting at arbitrary token boundaries, the system splits around sentence boundaries.
+
+```bash
+Sentence 1
+Sentence 2
+Sentence 3
+
+Sentence 4
+Sentence 5
+Sentence 6
+```
+
+#### Advantages
+
+- Preserves meaning better
+- More natural and readable
+
+#### Disadvantage
+
+Sentence lengths can vary significantly.
+
+---
+
+### 3. Semantic Chunking
+
+Semantic chunking groups sentences or paragraphs based on their meaning.
+
+Conceptually:
+
+```bash
+Topic A
+  ├── Authentication configuration
+  ├── Token validation
+  └── Session management
+
+Topic B
+  ├── Database indexing
+  ├── Query planning
+  └── Connection pooling
+```
+
+#### Advantages
+
+- High topic relevance
+- Keeps related content together
+
+#### Disadvantages
+
+- More complicated
+- Requires embeddings
+
+---
+
+### 4. Parent Document Chunking
+
+Small chunks are used for retrieval, but the larger parent section is returned to the LLM.
+
+```bash
+    Large Parent Document
+              │
+   ┌──────────┼──────────┐
+   ↓          ↓          ↓
+ Small      Small      Small
+ Chunk      Chunk      Chunk
+```
+
+The small chunks provide retrieval precision while the parent document provides context.
+
+---
+
+### 5. Sliding Window Chunking
+
+A moving window is used to create overlapping chunks.
+
+```bash
+Window 1
+████████
+
+    Window 2
+    ████████
+
+        Window 3
+        ████████
+```
+
+This preserves more context across chunk boundaries.
+
+#### Advantages
+
+- Good coverage
+- Maintains context flow
+
+#### Disadvantage
+
+More chunks mean more storage and potentially more retrieval cost.
+
+---
+
+### 6. Structure-Aware Chunking
+
+The document's structure is used to determine chunk boundaries.
+
+For example:
+
+```bash
+# Authentication
+    ↓
+Chunk 1
+
+## Token Validation
+    ↓
+Chunk 2
+
+- Access token
+- Refresh token
+    ↓
+Chunk 3
+
+Configuration Table
+    ↓
+Chunk 4
+
+Code Block
+    ↓
+Chunk 5
+```
+
+This works particularly well for:
+
+- Documentation
+- Code
+- Structured PDFs
+- Knowledge bases
+
+### How should you choose?
+
+There is no universally best chunking strategy.
+
+The right strategy depends on the data.
+
+A production system may combine multiple approaches:
+
+```bash
+Structure-aware splitting
+        +
+Semantic grouping
+        +
+Parent document retrieval
+```
+
+You should also experiment with chunk sizes such as:
+
+```bash
+256 tokens
+512 tokens
+1024 tokens
+```
+
+and measure actual retrieval performance.
+
+### Key takeaway
+
+> Good chunks bring the right context. The right context helps the LLM produce the right answer.
+
+---
+
+## 4. Multi-Query Retrieval
+
+> One question. Multiple perspectives. Better results.
+
+A single query can fail because documents may describe the same concept using completely different language.
+
+Even if query expansion improves the wording, searching in only one direction can still miss relevant documents.
+
+### The idea
+
+Instead of searching once, ask the LLM to generate multiple versions of the query.
+
+For example:
+
+Original question:
+
+> How does OAuth token refresh work?
+
+The system might generate:
+
+```bash
+What is OAuth token refresh?
+
+How does a refresh token work?
+
+What happens when an access token expires?
+
+How does an application obtain a new access token?
+
+What is the OAuth refresh-token flow?
+```
+
+Each query is searched independently.
+
+```bash
+               Original Question
+                     ↓
+               Generate Queries
+                     ↓
+        ┌────────┬────────┬────────┐
+        ↓        ↓        ↓        ↓
+      Search   Search   Search   Search
+        └────────┴────────┴────────┘
+                     ↓
+               Merge & Rerank
+                     ↓
+                Final Chunks
+```
+
+### Why this works
+
+Different documents use different terminology.
+
+One document might say:
+
+```bash
+OAuth token refresh
+```
+
+while another says:
+
+```bash
+renewing an expired access token
+```
+
+and another says:
+
+```bash
+obtaining a new bearer token using a refresh credential
+```
+
+Multiple queries give the retriever more opportunities to find relevant information.
+
+### Multi-Query vs Query Expansion
+
+These concepts are related but not identical.
+
+| Feature     | Query Expansion    | Multi-Query          |
+| ----------- | ------------------ | -------------------- |
+| Main goal   | Better wording     | Different viewpoints |
+| Queries     | Similar variations | More diverse queries |
+| Focus       | Query improvement  | Retrieval coverage   |
+| Recall      | Good               | Often higher         |
+| Typical use | General search     | Production RAG       |
+
+### When it works best
+
+Multi-query retrieval is particularly useful for:
+
+- Large knowledge bases
+- Technical documentation
+- Enterprise search
+- Research papers
+- Legal documents
+- Medical documents
+- Production RAG systems
+
+### Key takeaway
+
+> Don't ask once. Ask in multiple smart ways.
+
+More angles give the retriever more chances to find the right information.
+
+---
+
+## 5. Parent Document Retrieval
+
+> Small chunks = better search. Parent documents = better understanding.
+
+Small chunks are useful because they make retrieval precise.
+
+But small chunks have a problem:
+
+**They can lose context.**
+
+Consider retrieving this chunk:
+
+```bash
+"... it automatically retries failed operations ..."
+```
+
+The chunk might be relevant, but by itself it doesn't tell us what "it" refers to.
+
+The original section might say:
+
+```bash
+"The job processor automatically retries failed operations when a worker temporarily loses access to the message queue."
+```
+
+The parent document provides the missing context.
+
+### How Parent Document Retrieval works
+
+#### Step 1: Create small chunks
+
+```bash
+Document
+   ↓
+Chunk 1
+Chunk 2
+Chunk 3
+Chunk 4
+...
+```
+
+#### Step 2: Search the small chunks
+
+The vector database retrieves the most relevant chunks.
+
+```bash
+Top Chunks:
+1
+2
+8
+9
+10
+```
+
+#### Step 3: Map chunks to their parent
+
+Each chunk stores a reference to its parent section or document.
+
+```bash
+Chunk 8
+   ↓
+Parent Document / Section
+```
+
+#### Step 4: Send the parent context to the LLM
+
+Instead of giving the LLM only the tiny chunk, provide the relevant parent section.
+
+```bash
+Small chunks → Search
+
+Parent document → Context
+```
+
+This creates a useful separation:
+
+> **Retrieve small. Read big.**
+
+### When to use it
+
+Parent document retrieval is useful when:
+
+- Chunks are very small
+- Documents contain many references
+- Answers require surrounding context
+- Pronouns and references are common
+- The meaning depends on information elsewhere in the section
+
+### Implementation tip
+
+Store a `parent_id` with each chunk.
+
+For example:
+
+```bash
+Chunk:
+{
+  id: "chunk_123",
+  parent_id: "section_42",
+  embedding: [...]
+}
+```
+
+After retrieval, use `parent_id` to fetch the larger context.
+
+### Key takeaway
+
+> Chunks help you find information. Parent documents help the model understand it.
+
+---
+
+## 6. Context Compression
+
+> Too much context can be as bad as too little.
+
+Imagine a retriever returns 40 chunks, but your LLM can effectively process only 8 useful chunks.
+
+Sending all 40 creates several problems:
+
+- Higher token usage
+- Higher cost
+- More irrelevant information
+- More redundancy
+- Potentially worse answers
+
+This is related to the **lost-in-the-middle** problem: important information can become harder for the model to use when surrounded by large amounts of irrelevant context.
+
+### How context compression works
+
+```bash
+40 Retrieved Chunks
+        ↓
+     Compress
+        ↓
+Keep Relevant Information
+        ↓
+8 Clean Chunks
+        ↓
+       LLM
+```
+
+The compressor attempts to remove everything that does not contribute meaningfully to answering the question.
+
+### What can be compressed?
+
+Common targets include:
+
+- Duplicate chunks
+- Filler sentences
+- Low-relevance information
+- Long-winded explanations
+- Off-topic sections
+- Repeated information
+
+### Popular compression techniques
+
+#### LLM Summarization
+
+Summarize each chunk into a smaller representation.
+
+```bash
+Large chunk
+    ↓
+1–2 sentence summary
+```
+
+#### Keyword / Keyphrase Extraction
+
+Keep the most important terms and phrases.
+
+#### Redundancy Removal
+
+Remove information that appears repeatedly across retrieved documents.
+
+#### Extractive Compression
+
+Keep only the sentences that directly contribute to answering the query.
+
+#### Relevance Scoring
+
+Score individual sentences or chunks and keep only high-scoring content.
+
+### Example
+
+Suppose retrieval returns 40 chunks.
+
+After compression:
+
+```bash
+40 chunks
+   ↓
+8 chunks
+   ↓
+~75% token reduction
+   ↓
+Better focused context
+```
+
+The exact improvement depends on the data and compression method, but the goal is to make the context **smaller without losing useful information**.
+
+### Key takeaway
+
+> More context is not always better. Relevant context is better.
+
+---
+
+## 7. HyDE
+
+#### Hypothetical Document Embeddings
+
+> Think before you search.
+
+HyDE stands for **Hypothetical Document Embeddings**.
+
+It addresses a common retrieval problem:
+
+**The user's query may be too short or vague to produce a strong embedding.**
+
+For example:
+
+```bash
+"message queue retries"
+```
+
+The query contains only a few terms.
+
+A better search signal could be a hypothetical answer generated by an LLM.
+
+### How HyDE works
+
+Instead of embedding the original question:
+
+```bash
+User Question
+     ↓
+Embedding
+     ↓
+Vector Search
+```
+
+HyDE introduces an intermediate generation step:
+
+```bash
+User Question
+     ↓
+Generate Hypothetical Answer
+     ↓
+Embed Hypothetical Answer
+     ↓
+Vector Search
+     ↓
+Retrieve Documents
+     ↓
+    LLM
+```
+
+For example, the user asks:
+
+> How does a message queue retry failed jobs?
+
+The LLM might generate a hypothetical answer such as:
+
+> A message processing system can retry a failed job when the worker encounters a temporary error. Retry policies commonly use a maximum attempt count and exponential backoff before moving permanently failed messages to a dead-letter queue.
+
+The hypothetical answer contains more meaningful domain terms than the original question.
+
+The system embeds that hypothetical answer and uses the embedding to search the knowledge base.
+
+### Why it can work
+
+The generated answer may contain:
+
+- More domain-specific terminology
+- More context
+- Better representation of the user's intent
+- Terms that are likely to appear in relevant documents
+
+This can improve semantic matching.
+
+### HyDE is not random guessing
+
+The hypothetical answer is not used as the final answer.
+
+It is primarily a **search representation**.
+
+The actual answer still comes from retrieved documents.
+
+```bash
+Question
+   ↓
+Hypothetical Answer
+   ↓
+Embedding
+   ↓
+Retrieve Real Documents
+   ↓
+Generate Final Answer
+```
+
+### HyDE vs Query Expansion
+
+Query expansion usually creates multiple alternative queries.
+
+HyDE generates a hypothetical document or answer and embeds that representation.
+
+```bash
+Query Expansion
+→ Multiple queries
+
+HyDE
+→ One hypothetical answer
+→ One embedding
+```
+
+### When HyDE is useful
+
+HyDE can help with:
+
+- RAG systems
+- Research assistants
+- Code search
+- Legal search
+- Medical document search
+- Enterprise knowledge bases
+- Vague or complex queries
+
+### Key takeaway
+
+> HyDE turns a weak question into a stronger search signal.
+
+---
+
+## 8. Self-RAG
+
+> Why search every time? Let the model decide first.
+
+Traditional RAG often retrieves documents for every query.
+
+But not every question needs external retrieval.
+
+For example:
+
+```bash
+What is the square root of 144?
+```
+
+Retrieving documents from a vector database would be unnecessary.
+
+### The problem
+
+Always retrieving causes:
+
+- Extra latency
+- Extra token usage
+- Additional infrastructure cost
+- Unnecessary vector database load
+
+Self-RAG introduces a decision step.
+
+```bash
+      User Question
+            ↓
+   Should I retrieve?
+            ↓
+   ┌────────┴────────┐
+  NO                YES
+   ↓                 ↓
+Answer            Retrieve
+Directly             ↓
+                  Generate
+```
+
+### How Self-RAG works
+
+The model first considers:
+
+- Do I need external information?
+- Do I already know the answer?
+- Is the question domain-specific?
+- Is the information likely to be recent?
+- Do I need private or internal documents?
+
+#### If the answer is NO
+
+The model answers using its internal knowledge.
+
+Example:
+
+```bash
+What is 15 × 8?
+```
+
+No retrieval is required.
+
+#### If the answer is YES
+
+The system retrieves relevant documents.
+
+Example:
+
+```bash
+What changed in our company's API documentation this week?
+```
+
+Retrieval is useful because the information is recent and internal.
+
+### When should Self-RAG retrieve?
+
+Typical cases include:
+
+- Recent information
+- Live information
+- Domain-specific knowledge
+- Private/internal documents
+- Complex multi-hop questions
+
+### When can it skip retrieval?
+
+Typical cases include:
+
+- General knowledge
+- Simple mathematics
+- Logic questions
+- Common facts
+- Questions where the model is sufficiently confident
+
+### Benefits
+
+Self-RAG can:
+
+- Reduce unnecessary retrieval
+- Save tokens
+- Reduce cost
+- Reduce vector database load
+- Improve response latency
+- Use retrieval when it actually matters
+
+### Key takeaway
+
+> Traditional RAG retrieves every time. Self-RAG decides whether retrieval is needed before acting.
+
+---
+
+## 9. CRAG
+
+#### Corrective Retrieval-Augmented Generation
+
+> Not every retrieved chunk is useful. CRAG checks the quality before trusting it.
+
+A retriever is not perfect.
+
+It can return:
+
+- Irrelevant chunks
+- Outdated information
+- Misleading information
+- Incomplete information
+
+If the LLM blindly trusts those chunks, it can produce a confident but incorrect answer.
+
+CRAG introduces a quality-control step.
+
+### How CRAG works
+
+```bash
+      User Question
+           ↓
+   Retrieve Documents
+           ↓
+Evaluate Retrieved Documents
+           ↓
+   ┌───────┴───────┐
+ GOOD              BAD
+   ↓                ↓
+Use Docs     Correct Retrieval
+                    ↓
+             Refine / Re-query
+                    ↓
+              Retrieve Again
+                    ↓
+               Final Context
+                    ↓
+                   LLM
+```
+
+The retrieved documents are evaluated before they are trusted.
+
+### What does the evaluator check?
+
+Potential criteria include:
+
+- Relevance
+- Completeness
+- Consistency
+- Whether the documents actually support the question
+
+If the documents are good enough, they can be passed to the LLM.
+
+If they are poor, the system can attempt corrective actions.
+
+Examples include:
+
+- Refine the query
+- Try another search
+- Expand the query
+- Rerank the results
+- Filter noisy chunks
+- Retrieve from another source
+
+### Example
+
+Suppose the user asks:
+
+> Which database is a good choice for high-volume event analytics?
+
+The retriever returns:
+
+```bash
+1. Introduction to relational databases
+2. Key-value cache configuration
+3. Columnar database architecture for analytics
+4. Basic SQL CRUD operations
+```
+
+The evaluator can determine that only some of these documents directly address the question.
+
+The system can then remove weak results and perform additional retrieval if necessary.
+
+The goal is:
+
+```bash
+Retrieve
+   ↓
+Check
+   ↓
+Correct
+   ↓
+Answer
+```
+
+### Benefits
+
+CRAG can:
+
+- Reduce confident wrong answers
+- Improve retrieval quality
+- Reduce hallucinations
+- Handle difficult queries
+- Filter noisy retrieval results
+- Improve the quality of final context
+
+### When CRAG helps most
+
+CRAG is particularly useful for:
+
+- Complex multi-hop questions
+- Ambiguous queries
+- Long-tail questions
+- Low-quality retrieval systems
+- Domain-specific technical search
+- Enterprise knowledge systems
+
+### CRAG vs Normal RAG
+
+Normal RAG:
+
+```bash
+Retrieve → Answer
+```
+
+CRAG:
+
+```bash
+Retrieve → Evaluate → Correct → Answer
+```
+
+The fundamental difference is that CRAG does not blindly trust the retriever.
+
+### Key takeaway
+
+> CRAG verifies the retrieved context before allowing the model to rely on it.
+
+---
+
+## Putting the Techniques Together
+
+These techniques do not need to be used independently.
+
+A production RAG system can combine several of them.
+
+For example:
+
+```bash
+                    User Query
+                        │
+                        ▼
+                 Self-RAG Decision
+                  /            \
+                 NO             YES
+                 │               │
+                 ▼               ▼
+             Direct Answer   Multi-Query
+                                 │
+                                 ▼
+                           Hybrid Search
+                           Vector + BM25
+                                 │
+                                 ▼
+                             Retrieval
+                                 │
+                                 ▼
+                              Reranking
+                                 │
+                                 ▼
+                          CRAG Evaluation
+                          /             \
+                       GOOD              BAD
+                        │                 │
+                        │         Re-query/Correct
+                        │                 │
+                        └───────┬─────────┘
+                                ▼
+                      Parent Document Retrieval
+                                │
+                                ▼
+                       Context Compression
+                                │
+                                ▼
+                               LLM
+                                │
+                                ▼
+                           Final Answer
+```
+
+Not every application needs every component.
+
+The correct architecture depends on:
+
+- Query complexity
+- Document structure
+- Retrieval quality
+- Latency requirements
+- Cost constraints
+- Accuracy requirements
+- Whether the information changes frequently
+
+---
+
+## A Practical Mental Model
+
+Each technique solves a different failure mode.
+
+| Problem                                         | Technique                     |
+| ----------------------------------------------- | ----------------------------- |
+| Correct chunk is retrieved but ranked too low   | **Reranking**                 |
+| Exact keywords and semantic meaning both matter | **Hybrid Search**             |
+| Documents are difficult to split correctly      | **Better Chunking**           |
+| One query misses relevant terminology           | **Multi-Query Retrieval**     |
+| Retrieved chunk lacks surrounding context       | **Parent Document Retrieval** |
+| Too many retrieved chunks overwhelm the model   | **Context Compression**       |
+| Query is vague or lacks useful search terms     | **HyDE**                      |
+| Retrieval isn't necessary for every question    | **Self-RAG**                  |
+| Retriever returns poor or misleading documents  | **CRAG**                      |
+
+---
+
+## A Strong Production RAG Pipeline
+
+A practical system might start with something relatively simple:
+
+```bash
+Documents
+   ↓
+Structure-Aware Chunking
+   ↓
+Embeddings + Keyword Index
+   ↓
+Hybrid Search
+   ↓
+Reranking
+   ↓
+Parent Context
+   ↓
+Context Compression
+   ↓
+LLM
+```
+
+Then add more advanced techniques only where measurements show they are needed.
+
+For example:
+
+```bash
+Self-RAG
+```
+
+can reduce unnecessary retrieval.
+
+```bash
+Multi-Query Retrieval
+```
+
+can improve recall for difficult questions.
+
+```bash
+HyDE
+```
+
+can help with vague queries.
+
+```bash
+CRAG
+```
+
+can add a validation and correction loop.
+
+---
+
+## The Bigger Picture
+
+The biggest mistake when building RAG systems is treating retrieval as a single operation:
+
+```bash
+Query → Vector DB → LLM
+```
+
+Real-world retrieval is closer to a pipeline of decisions:
+
+```bash
+Should I retrieve?
+        ↓
+What should I search for?
+        ↓
+Where should I search?
+        ↓
+How should I split the documents?
+        ↓
+Which results are actually relevant?
+        ↓
+Which results should be ranked highest?
+        ↓
+How much context should I provide?
+        ↓
+Is the retrieved context trustworthy?
+        ↓
+Can the LLM answer from this context?
+```
+
+The quality of the final answer is often determined **before the LLM generates a single token**.
+
+> Better retrieval → Better context → Better answers.
+
+And the goal isn't to build the most complicated RAG pipeline.
+
+The goal is to build the **simplest retrieval architecture that reliably provides the right context for your workload**.

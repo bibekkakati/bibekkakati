@@ -1,0 +1,324 @@
+---
+title: "Building a Multi-Agent AI Pipeline with Mastra and TypeScript"
+publishedAt: "2026-08-17"
+updatedAt: "2026-08-17"
+author: "Bibek Kakati"
+summary: "A deep dive into how Clause AI uses a multi-agent architecture with Mastra to parse, summarize, assess risk, and power RAG-based Q&A over rental agreements — with fault-tolerant, idempotent orchestration at its core."
+image: ""
+---
+
+Building an AI feature is easy. Building a reliable multi-agent pipeline that coordinates four specialized AI agents, persists intermediate state, skips already-completed work on retries, and keeps the API responsive while the models think — that is the hard part.
+
+This post walks through the architecture behind **[Clause AI](https://github.com/bibekkakati/clause.ai)**, a platform that analyzes rental and lease agreements. It extracts key terms, flags risky clauses, and lets users chat with their contracts using RAG (Retrieval-Augmented Generation) — all powered by a coordinated pipeline of specialized AI agents.
+
+## The Problem with "Just Call an LLM"
+
+The naive approach to building an AI-powered document analysis tool would be a single function that calls an LLM, parses the output, and saves it to a database. It works until it doesn't.
+
+The moment you introduce multiple steps — parsing, summarizing, embedding, risk analysis — things break:
+
+- A worker crashes mid-pipeline, and you re-run everything from scratch.
+- You burn API quota re-processing steps that already succeeded.
+- Partial writes leave the database in an inconsistent state.
+- Multiple uploads compete for rate-limited model endpoints.
+
+Clause AI was designed from the start to handle these failure modes, not as an afterthought.
+
+## Agent Design: Four Specialists, One Pipeline
+
+Rather than one monolithic prompt that tries to do everything, the system uses four purpose-built agents — each with a focused responsibility, tuned model parameters, and a structured output schema.
+
+| Agent         | Responsibility                                                          | Model Settings             |
+| ------------- | ----------------------------------------------------------------------- | -------------------------- |
+| Parser Agent  | Extracts entities, dates, parties, payments, and clause-level structure | Low reasoning, temp 0.2    |
+| Summary Agent | Converts legal jargon into plain-English bullet points                  | Low reasoning, temp 0.6    |
+| Risk Agent    | Flags risky or unfair clauses with severity scoring                     | Medium reasoning, temp 0.4 |
+| Query Agent   | Answers user questions via RAG with tool use                            | Medium reasoning, temp 0.7 |
+
+Each agent is configured with distinct reasoning levels and temperatures. The Parser Agent runs at a low temperature (0.2) because extraction requires precision — you want deterministic, faithful reproduction of what the document says. The Query Agent runs warmer (0.7) because conversational responses benefit from more natural phrasing.
+
+### Structured Output with Zod Schemas
+
+Every agent produces validated, structured output using Zod schemas. The Parser Agent, for example, returns a typed object with nullable fields — if information is missing from the document, the agent returns `null` rather than hallucinating data.
+
+```typescript title="parser.agent.ts"
+const ResponseSchema = z.object({
+    title: z.string().nullable(),
+    type: z.enum(AGREEMENT_TYPES).nullable(),
+    metadata: z
+        .object({
+            effectiveDate: z.string().nullable(),
+            expiryDate: z.string().nullable(),
+            autoRenewal: z.boolean().nullable(),
+            governingLaw: z.string().nullable(),
+        })
+        .nullable(),
+    parties: z
+        .array(
+            z.object({
+                name: z.string(),
+                role: z.enum(AGREEMENT_PARTY_ROLES),
+                address: z.string().nullable(),
+            }),
+        )
+        .nullable(),
+    sections: z
+        .array(
+            z.object({
+                ref: z.string(),
+                type: z.enum(SECTION_CLAUSE_TYPES),
+                heading: z.string(),
+                content: z.string(),
+            }),
+        )
+        .nullable(),
+    error: z.string().nullable(),
+});
+```
+
+This schema-first approach means downstream agents and database writes can trust the shape of the data they receive. No defensive parsing, no "hope the LLM returned the right format" — it either validates or it fails.
+
+## Orchestration with Mastra Workflows
+
+The orchestration layer is where the architecture earns its complexity budget. The project uses **[Mastra](https://mastra.ai)** — a TypeScript-native agent orchestration framework — to define workflows as composable, sequential pipelines with branching, iteration, and shared state.
+
+Here is the main workflow definition, stripped to its essence:
+
+```typescript title="agent.workflow.ts"
+export const agentWorkflow = createWorkflow({
+    id: "agent-workflow",
+    inputSchema: z.any(),
+    outputSchema: z.object({ status: z.string() }),
+    stateSchema: WorkflowStateSchema,
+})
+    .then(initiateStateHydration)
+    .branch([[async ({ state }) => !state.skipParserAgent, parsingWorkflow]])
+    .branch([[async ({ state }) => !state.skipSummaryAgent, summaryWorkflow]])
+    .then(embeddingWorkflow)
+    .branch([[async ({ state }) => !state.skipRiskAgent, riskWorkflow]])
+    .then(finishStep)
+    .commit();
+```
+
+The `.then()` calls chain steps sequentially. The `.branch()` calls conditionally execute sub-workflows based on runtime state. This is where fault tolerance comes in — but more on that in the next section.
+
+Each sub-workflow itself is a two-step pattern: **LLM call → DB persistence**.
+
+```typescript title="summary.workflow.ts"
+export const summaryWorkflow = createWorkflow({
+    id: "summary-workflow",
+    inputSchema: z.any(),
+    outputSchema: z.any(),
+    stateSchema: WorkflowStateSchema,
+})
+    .then(summaryAgentStep) // LLM call: generate summary
+    .then(storeSummaryStep) // DB call: persist to Postgres
+    .commit();
+```
+
+This separation is deliberate. The LLM step writes only to workflow state — an in-memory, transient object. The DB step is a separate, retryable operation. If the DB write fails, the LLM result isn't lost; it lives in state and can be retried without re-running the expensive model call.
+
+## State Hydration: The Key to Fault Tolerance
+
+The most critical design pattern in the entire system is **state hydration** — the first step of every pipeline run.
+
+Before any agent executes, the workflow reads the current state of the agreement from the database. If a previous run already completed the parsing step (title, type, parties, and sections exist in the DB), the hydration step sets `skipParserAgent: true` in the workflow state. The main workflow's `.branch()` sees this flag and skips the parsing sub-workflow entirely.
+
+```typescript title="hydration.workflow.ts"
+const hydrateWorkflowState = async (agreementId, userId, state) => {
+    const agreement = await AgreementsService.fetchAgreement(
+        agreementId,
+        userId,
+    );
+
+    const [dbSections, dbRisks] = await Promise.all([
+        AgreementsService.fetchSectionsByAgreement(agreementId, userId),
+        AgreementsService.fetchRisksByAgreement(agreementId, userId),
+    ]);
+
+    return {
+        ...state,
+        title: agreement.title,
+        sections: dbSections.length > 0 ? dbSections : state.sections,
+        risks: dbRisks.length > 0 ? dbRisks : state.risks,
+        // Skip flags based on what already exists
+        skipParserAgent: Boolean(
+            agreement.title &&
+            agreement.metadata &&
+            agreement.parties &&
+            dbSections.length > 0,
+        ),
+        skipSummaryAgent: Boolean(agreement.summary),
+        skipRiskAgent: Boolean(dbRisks.length > 0),
+    };
+};
+```
+
+This means:
+
+- **Crash recovery is free.** If the worker dies after parsing but before summarization, the retry picks up exactly where it left off.
+- **No wasted API calls.** Already-completed LLM steps are not re-run.
+- **Idempotent by design.** Running the workflow twice on the same agreement produces the same result without side effects.
+
+There is also a `forceRestart` flag that bypasses hydration entirely, useful when the user explicitly wants to re-process a document from scratch.
+
+## Handling Fan-Out: Embeddings and Risk Analysis
+
+Not every step in the pipeline is a simple A→B chain. The embedding and risk workflows use Mastra's `.foreach()` primitive to fan out work across multiple items.
+
+### Embedding Workflow
+
+After parsing, each section needs a vector embedding for semantic search. The embedding workflow:
+
+1. **Prepares** a list of sections that don't yet have embeddings (idempotent — already-embedded sections are skipped).
+2. **Fans out** with `.foreach()`, running each section through a per-section sub-workflow.
+3. Each sub-workflow generates the embedding, then persists it to the database.
+
+```typescript title="embedding.workflow.ts"
+export const embeddingWorkflow = createWorkflow({
+    id: "embedding-workflow",
+    inputSchema: z.any(),
+    outputSchema: z.any(),
+    stateSchema: WorkflowStateSchema,
+})
+    .then(prepareEmbeddingSectionsStep)
+    .foreach(embeddingPerSectionWorkflow)
+    .commit();
+```
+
+### Risk Workflow
+
+The risk workflow follows a similar fan-out pattern, but with a twist: sections are grouped by clause type before analysis. Instead of analyzing 15+ individual sections, the system groups them into logical categories (Rent, Termination, Maintenance, etc.) and analyzes each group in a single LLM call. This reduces the number of API calls while keeping each prompt focused.
+
+```typescript title="risk.workflow.ts"
+export const riskWorkflow = createWorkflow({
+    id: "risk-workflow",
+    inputSchema: z.any(),
+    outputSchema: z.any(),
+    stateSchema: WorkflowStateSchema,
+})
+    .then(prepareRiskSectionsStep) // Group sections by type
+    .foreach(riskAnalyzeStep) // Analyze each group
+    .then(storeRiskResultStep) // Persist all results
+    .commit();
+```
+
+The risk scoring itself is intentionally conservative. The Risk Agent's system prompt explicitly states that "absence of risk is a valid and expected outcome" and sets a high bar: only flag issues that are "risky enough to mention in a legal memo." Each identified risk gets a numeric score (0–100) that maps to severity levels.
+
+| Score Range | Severity |
+| ----------- | -------- |
+| 0–40        | LOW      |
+| 41–60       | MEDIUM   |
+| 61–80       | HIGH     |
+| 81–100      | CRITICAL |
+
+## The RAG Q&A Flow: Query Agent with Tool Use
+
+Once the processing pipeline completes, the agreement is ready for interactive Q&A. The Query Agent is architecturally different from the other three — it runs on-demand per user question rather than as part of the batch pipeline, and it uses **tool calling** to decide what information it needs.
+
+The agent has access to two tools:
+
+- **`fetchSectionsTool`** — Generates a query embedding, runs vector similarity search against the agreement's sections in pgvector, and returns the most relevant sections within a token budget.
+- **`fetchRisksTool`** — Returns pre-identified risks from the database (no embedding step needed).
+
+The critical design choice here is that the agent decides whether to use tools at all. For simple questions that can be answered from the agreement's metadata (already injected into the system prompt) or from conversation history, no tool call is made. This keeps simple queries fast.
+
+```typescript title="sections.tool.ts"
+// Token-budgeted retrieval instead of fixed top-K
+const selectedSections = [];
+for (const s of sections) {
+    const tokens = estimateTokens(s.content) + estimateTokens(s.heading);
+
+    if (tokens + usedTokens > maxTokens) break;
+    usedTokens += tokens;
+
+    selectedSections.push({
+        section: s.ref,
+        heading: s.heading,
+        content: s.content,
+        similarity: s.similarity,
+    });
+}
+```
+
+The sections tool uses **token-budgeted retrieval** rather than a fixed top-K count. Since the Query Agent already carries conversation history and agreement metadata in its context window, blindly returning 10 sections could overflow the context and degrade response quality. Instead, sections are added until a token cap is reached, regardless of how many or how few that turns out to be.
+
+### Async Processing with Polling
+
+The Q&A flow is fully asynchronous. When a user sends a question:
+
+1. The message is saved and a query ID is returned immediately.
+2. The Query Agent processes the question in a background worker.
+3. The client polls the query ID until the status changes from **Processing** to **Success** or **Failed**.
+
+This keeps the API responsive even when the model takes several seconds to reason through a complex question.
+
+## Decoupling with BullMQ
+
+The entire processing pipeline is decoupled from the API layer through **[BullMQ](https://bullmq.io)** (Redis-backed job queues). When a user uploads a document, the API doesn't start AI processing inline — it enqueues a job.
+
+This solves two problems:
+
+1. **Rate limit protection.** If multiple agreements are uploaded simultaneously, the queue absorbs the burst and processes jobs sequentially, avoiding concurrent model calls that would hit API rate limits.
+2. **Process isolation.** A crash in the AI worker doesn't take down the API server. The job stays in the queue and gets retried.
+
+The message worker handles both file processing jobs and email notification jobs, routing based on job name:
+
+```typescript title="message.worker.ts"
+if (job.name === PROCESS_FILE_JOB) {
+    await WorkflowService.startAgreementProcessing(agreementId, fileId, userId);
+} else if (job.name === EMAIL_NOTIFICATION_JOB) {
+    await NotificationService.sendEmailNotification(email, type, payload);
+}
+```
+
+## Model Resilience: Fallback and Rate Limit Handling
+
+Every agent is configured with multiple model fallbacks. If the primary model returns a 429 (rate limited), the system marks it as unavailable for the duration specified in the `retry-after` header and automatically falls back to the next available model.
+
+```typescript title="parser.agent.ts"
+const parserAgent = new Agent({
+    id: "parser-agent",
+    name: "Parser Agent",
+    instructions: Instructions,
+    model: getAvailableModels().map((model) => ({
+        id: model,
+        model: model,
+        modelSettings: {
+            reasoning: "low",
+            temperature: 0.2,
+        },
+    })),
+});
+```
+
+This means the pipeline doesn't fail because of a temporary rate limit — it gracefully degrades to a different model and continues processing.
+
+## Putting It All Together
+
+Here is the full pipeline from upload to interactive Q&A:
+
+1. **Upload** — User uploads a PDF or DOCX lease agreement.
+2. **Queue** — A BullMQ job is enqueued; the API returns immediately.
+3. **Hydration** — The worker checks what work has already been done for this agreement.
+4. **Parse** — The Parser Agent extracts structured data (conditionally skipped).
+5. **Summarize** — The Summary Agent generates plain-English bullet points (conditionally skipped).
+6. **Embed** — Each section is converted into a vector embedding (per-section fan-out, skips already-embedded sections).
+7. **Risk** — The Risk Agent scores and classifies risky clauses (conditionally skipped, fan-out by clause type).
+8. **Finish** — Status is set to **Success**; the agreement is ready for Q&A.
+9. **Chat** — The Query Agent answers questions using tool-based RAG, grounded strictly in the document.
+
+Every step is discrete, retryable, and idempotent. Intermediate state is persisted between steps. The workflow can be interrupted and resumed without losing progress or wasting API calls.
+
+## Key Takeaways
+
+Building a multi-agent system isn't about calling multiple LLMs — it's about **orchestrating** them. The real engineering work is in the scaffolding:
+
+- **Schema-first agent design** ensures downstream consumers can trust the data shape.
+- **State hydration** makes crash recovery and retries free.
+- **Separating LLM calls from DB writes** means expensive model calls aren't repeated when only the persistence step fails.
+- **Fan-out with `.foreach()`** handles variable-length work (sections, risk groups) without hardcoding batch sizes.
+- **Token-budgeted retrieval** adapts to the available context window rather than using arbitrary limits.
+- **Job queues** decouple compute-intensive AI work from the request-response cycle.
+
+The multi-agent approach isn't just an architectural choice — it's a reliability strategy. Each agent has a focused responsibility, a clear contract, and a failure boundary that doesn't contaminate the rest of the pipeline.
