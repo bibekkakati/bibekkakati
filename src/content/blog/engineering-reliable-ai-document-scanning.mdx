@@ -34,7 +34,7 @@ The biggest mistake when using LLMs for data extraction is asking for free-text 
 
 Propio enforces strict structured outputs at the API level using the `@google/genai` SDK's schema definition.
 
-```javascript title="ocr.agent.js"
+```javascript
 const config = {
     responseMimeType: "application/json",
     responseSchema: {
@@ -105,7 +105,7 @@ AI APIs go down. They get rate-limited. Models get overloaded. If your feature r
 
 To ensure near-zero downtime for the Smart Scan feature, Propio implements a multi-model cascade with exponential backoff.
 
-```javascript title="ai.client.js"
+```javascript
 const Models = ["gemma-4-31b-it", "gemini-2.5-flash-lite"];
 
 const generateContent = async (models, config, contents) => {

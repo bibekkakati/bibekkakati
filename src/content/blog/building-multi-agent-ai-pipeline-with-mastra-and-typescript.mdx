@@ -41,7 +41,7 @@ Each agent is configured with distinct reasoning levels and temperatures. The Pa
 
 Every agent produces validated, structured output using Zod schemas. The Parser Agent, for example, returns a typed object with nullable fields — if information is missing from the document, the agent returns `null` rather than hallucinating data.
 
-```typescript title="parser.agent.ts"
+```typescript
 const ResponseSchema = z.object({
     title: z.string().nullable(),
     type: z.enum(AGREEMENT_TYPES).nullable(),
@@ -84,7 +84,7 @@ The orchestration layer is where the architecture earns its complexity budget. T
 
 Here is the main workflow definition, stripped to its essence:
 
-```typescript title="agent.workflow.ts"
+```typescript
 export const agentWorkflow = createWorkflow({
     id: "agent-workflow",
     inputSchema: z.any(),
@@ -104,7 +104,7 @@ The `.then()` calls chain steps sequentially. The `.branch()` calls conditionall
 
 Each sub-workflow itself is a two-step pattern: **LLM call → DB persistence**.
 
-```typescript title="summary.workflow.ts"
+```typescript
 export const summaryWorkflow = createWorkflow({
     id: "summary-workflow",
     inputSchema: z.any(),
@@ -124,7 +124,7 @@ The most critical design pattern in the entire system is **state hydration** —
 
 Before any agent executes, the workflow reads the current state of the agreement from the database. If a previous run already completed the parsing step (title, type, parties, and sections exist in the DB), the hydration step sets `skipParserAgent: true` in the workflow state. The main workflow's `.branch()` sees this flag and skips the parsing sub-workflow entirely.
 
-```typescript title="hydration.workflow.ts"
+```typescript
 const hydrateWorkflowState = async (agreementId, userId, state) => {
     const agreement = await AgreementsService.fetchAgreement(
         agreementId,
@@ -174,7 +174,7 @@ After parsing, each section needs a vector embedding for semantic search. The em
 2. **Fans out** with `.foreach()`, running each section through a per-section sub-workflow.
 3. Each sub-workflow generates the embedding, then persists it to the database.
 
-```typescript title="embedding.workflow.ts"
+```typescript
 export const embeddingWorkflow = createWorkflow({
     id: "embedding-workflow",
     inputSchema: z.any(),
@@ -190,7 +190,7 @@ export const embeddingWorkflow = createWorkflow({
 
 The risk workflow follows a similar fan-out pattern, but with a twist: sections are grouped by clause type before analysis. Instead of analyzing 15+ individual sections, the system groups them into logical categories (Rent, Termination, Maintenance, etc.) and analyzes each group in a single LLM call. This reduces the number of API calls while keeping each prompt focused.
 
-```typescript title="risk.workflow.ts"
+```typescript
 export const riskWorkflow = createWorkflow({
     id: "risk-workflow",
     inputSchema: z.any(),
@@ -223,7 +223,7 @@ The agent has access to two tools:
 
 The critical design choice here is that the agent decides whether to use tools at all. For simple questions that can be answered from the agreement's metadata (already injected into the system prompt) or from conversation history, no tool call is made. This keeps simple queries fast.
 
-```typescript title="sections.tool.ts"
+```typescript
 // Token-budgeted retrieval instead of fixed top-K
 const selectedSections = [];
 for (const s of sections) {
@@ -264,7 +264,7 @@ This solves two problems:
 
 The message worker handles both file processing jobs and email notification jobs, routing based on job name:
 
-```typescript title="message.worker.ts"
+```typescript
 if (job.name === PROCESS_FILE_JOB) {
     await WorkflowService.startAgreementProcessing(agreementId, fileId, userId);
 } else if (job.name === EMAIL_NOTIFICATION_JOB) {
@@ -276,7 +276,7 @@ if (job.name === PROCESS_FILE_JOB) {
 
 Every agent is configured with multiple model fallbacks. If the primary model returns a 429 (rate limited), the system marks it as unavailable for the duration specified in the `retry-after` header and automatically falls back to the next available model.
 
-```typescript title="parser.agent.ts"
+```typescript
 const parserAgent = new Agent({
     id: "parser-agent",
     name: "Parser Agent",
