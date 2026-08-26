@@ -1,0 +1,115 @@
+---
+title: "The State Pattern Trap: Why GoF Is Not Always the Best Choice"
+publishedAt: "2026-08-26"
+updatedAt: "2026-08-26"
+author: "Bibek Kakati"
+summary: "The classic GoF State Pattern looks great in textbooks, but it creates tightly coupled, hard-to-maintain code in real-world applications. Learn when to use a central FSM instead."
+image: ""
+---
+
+Have you ever tried to use the classic [Gang of Four (GoF)](https://www.geeksforgeeks.org/system-design/gang-of-four-gof-design-patterns/) State Pattern in real code? You might have hit a wall. You might have thought, "Wait, this feels way too connected."
+
+You are not wrong about that.
+
+In school and many engineering interviews, the GoF State Pattern looks great. It promises to fix big, ugly `switch` statements. But real business rules are hard. When you use this pattern in real life, it can become a huge mess. Every state knows too much about the other states.
+
+Let us look at why this happens. We will learn the difference between the GoF pattern and a Finite State Machine (FSM). We will also learn when to use each one.
+
+---
+
+## The False Promise of the GoF State Pattern
+
+The main idea of the GoF State Pattern is to spread out the work.
+
+The main object gives its work to state objects. But there is a catch. The state classes themselves must trigger the change to the next state.
+
+### Example: The Traffic Light
+
+Think about a simple traffic light. It goes Red to Green to Yellow to Red. It does this forever.
+
+```typescript
+class RedState implements TrafficLightState {
+    change(context: TrafficLight): void {
+        console.log("RED light, Stop");
+        context.setState(new GreenState()); // Very connected!
+    }
+}
+```
+
+**The Problem:** `RedState` is forced to know about `GreenState`.
+
+This is fine for a simple traffic light. It is a closed loop. The rules will never change.
+
+But what happens when business rules change?
+Imagine the city council makes a new rule. From midnight to 5:00 AM, the light must flash yellow.
+
+Now, you must open your `RedState` and `YellowState` classes. You have to add new time checks. You have to add the new flashing state. The more states you add, the messier your code gets.
+
+---
+
+## The Better Choice: The Central FSM
+
+In the real world, things do not always happen in a straight line.
+
+An online order does not just go from Pending to Shipped to Delivered. It can jump from Pending to Cancelled. It can go from Shipped to Returned.
+
+If you use GoF here, your `PendingState` needs to know about many other states. It gets too big.
+
+This is where the Finite State Machine (FSM) comes in.
+The main idea here is central control. State classes become simple. They only hold the rules for what happens inside that specific state. A central controller handles the moves between states. We call this central controller an Orchestrator.
+
+### Example: Order Processing
+
+```typescript
+const orderRules = {
+    PENDING: {
+        PAID: "SHIPPED",
+        CANCELLED: "CANCELLED",
+    },
+    SHIPPED: {
+        ARRIVED: "DELIVERED",
+        RETURNED: "RETURNED",
+    },
+};
+
+class OrderController {
+    currentState = "PENDING";
+
+    handleEvent(event: string) {
+        const nextState = orderRules[this.currentState]?.[event];
+        if (nextState) {
+            this.currentState = nextState;
+            // Run the state logic here
+        } else {
+            console.log("Bad move!");
+        }
+    }
+}
+```
+
+**Why this works better:**
+
+1. **Not Connected:** State handlers do not know about each other.
+2. **Clear Rules:** You can look at one simple list to understand the whole flow.
+3. **Easy to Change:** Adding a new state does not break your old code. You just update the rules list.
+
+---
+
+## The Final Choice: Which Should You Use?
+
+Here are some simple rules to follow.
+
+### Use the GoF State Pattern when:
+
+- The flow is always a simple loop. A traffic light is a good example.
+- The rules are locked. You are very sure you will never add new states.
+
+### Use a Central FSM when:
+
+- The rules are complex and can jump around. Online orders and game AI are good examples.
+- Outside events choose the next state. If a user click or a timer changes things, use an FSM.
+- You need to track your code. A central FSM makes it very easy to see why a state changed.
+
+### Final Thoughts
+
+Do not let old textbooks force you to write bad code. The GoF State Pattern is great for learning and for simple problems. But for complex real world software, a central FSM will save you a lot of stress.
