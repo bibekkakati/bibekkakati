@@ -124,17 +124,30 @@
         @apply bg-background text-foreground;
     }
 
+    /* Inline code (not inside code blocks) */
+    :not(pre) > code {
+        color: var(--foreground) / 90%;
+    }
+
+    /* Code blocks: ensure Shiki inline styles win over prose typography */
+    pre[data-language] code {
+        color: inherit !important;
+        background-color: transparent !important;
+    }
+
     /* Light theme / Default state */
     .astro-code,
+    .astro-code code,
     .astro-code span {
-        color: var(--shiki-light) !important;
-        background-color: var(--shiki-light-bg) !important;
+        color: var(--shiki-light, #f8f8f2) !important;
+        background-color: var(--shiki-light-bg, #282a36) !important;
     }
 
     /* Dark theme state (triggered by a .dark class) */
     .dark .astro-code,
+    .dark .astro-code code,
     .dark .astro-code span {
-        color: var(--shiki-dark) !important;
-        background-color: var(--shiki-dark-bg) !important;
+        color: var(--shiki-dark, #f8f8f2) !important;
+        background-color: var(--shiki-dark-bg, #282a36) !important;
     }
 }
