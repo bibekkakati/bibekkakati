@@ -8,10 +8,29 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { DATA } from "@/data/resume";
+import { cn } from "@/lib/utils";
+import { X } from "lucide-react";
 
-export default function Navbar() {
+interface NavbarProps {
+    isOpen?: boolean;
+    isNonHomepage?: boolean;
+    onClose?: () => void;
+}
+
+export default function Navbar({
+    isOpen = true,
+    isNonHomepage = false,
+    onClose,
+}: NavbarProps) {
     return (
-        <div className="pointer-events-none fixed inset-x-0 bottom-4 z-30">
+        <div
+            className={cn(
+                "pointer-events-none fixed inset-x-0 bottom-4 z-30 transition-all duration-300 ease-out",
+                isNonHomepage && !isOpen
+                    ? "max-md:translate-y-28 max-md:opacity-0"
+                    : "translate-y-0 opacity-100",
+            )}
+        >
             <Dock className="z-50 pointer-events-auto relative h-14 p-2 w-fit mx-auto flex gap-2 border bg-card/90 backdrop-blur-3xl shadow-[0_0_10px_3px] shadow-primary/5">
                 {DATA.navbar.map((item) => {
                     const isExternal = item.href.startsWith("http");
@@ -101,6 +120,22 @@ export default function Navbar() {
                         <TooltipArrow className="fill-primary" />
                     </TooltipContent>
                 </Tooltip>
+                {onClose && (
+                    <>
+                        <Separator
+                            orientation="vertical"
+                            className="md:hidden h-2/3 m-auto w-px bg-border"
+                        />
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="md:hidden flex items-center justify-center size-9 rounded-2xl bg-background text-muted-foreground hover:text-foreground hover:bg-muted border border-border transition-colors cursor-pointer shrink-0"
+                            aria-label="Close navigation"
+                        >
+                            <X className="size-4" />
+                        </button>
+                    </>
+                )}
             </Dock>
         </div>
     );

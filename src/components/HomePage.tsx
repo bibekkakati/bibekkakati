@@ -9,7 +9,7 @@ import { ArrowUpRight } from "lucide-react";
 import React from "react";
 import Markdown from "react-markdown";
 
-const BLUR_FADE_DELAY = 0.04;
+const BLUR_FADE_DELAY = 0.01;
 
 export default function HomePage() {
     const sectionComponents: Record<string, React.ReactNode> = {
@@ -153,7 +153,7 @@ export default function HomePage() {
     return (
         <main className="min-h-dvh flex flex-col gap-14 relative">
             <section id="hero">
-                <div className="mx-auto w-full max-w-2xl space-y-8">
+                <div className="mx-auto w-full space-y-8">
                     <div className="gap-2 gap-y-6 flex flex-col md:flex-row justify-between">
                         <div className="gap-2 flex flex-col order-2 md:order-1">
                             <BlurFadeText

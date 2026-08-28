@@ -1,7 +1,7 @@
 import BlurFade from "@/components/magicui/blur-fade";
 import { ChevronRight } from "lucide-react";
 
-const BLUR_FADE_DELAY = 0.04;
+const BLUR_FADE_DELAY = 0.01;
 
 interface Post {
     id: string;
