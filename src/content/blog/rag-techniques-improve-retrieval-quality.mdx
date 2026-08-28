@@ -43,7 +43,7 @@ For example, suppose the correct answer is ranked at position #19.
 
 If the application only sends the top 3–5 chunks to the LLM, the correct information never reaches the model.
 
-```bash
+```plaintext
                 100 Pages
                     ↓
               Vector Search
@@ -134,7 +134,7 @@ Using only one can cause important documents to be missed.
 
 Consider this query:
 
-```bash
+```plaintext
 "Redis connection timeout"
 ```
 
@@ -158,7 +158,7 @@ But keyword search may fail when the document uses different terminology.
 
 Hybrid search combines both approaches:
 
-```bash
+```plaintext
                 User Query
                     │
           ┌─────────┴─────────┐
@@ -188,13 +188,13 @@ Popular approaches include:
 
 Vector search is good at understanding intent:
 
-```bash
+```plaintext
 "cache performance troubleshooting"
 ```
 
 Keyword search is good at exact terms:
 
-```bash
+```plaintext
 "Redis MISCONF"
 ```
 
@@ -251,7 +251,7 @@ The document is divided into chunks of a fixed number of tokens.
 
 For example:
 
-```bash
+```plaintext
 Document
    ↓
 400 tokens
@@ -281,7 +281,7 @@ An overlap can be added between chunks.
 
 Instead of splitting at arbitrary token boundaries, the system splits around sentence boundaries.
 
-```bash
+```plaintext
 Sentence 1
 Sentence 2
 Sentence 3
@@ -308,7 +308,7 @@ Semantic chunking groups sentences or paragraphs based on their meaning.
 
 Conceptually:
 
-```bash
+```plaintext
 Topic A
   ├── Authentication configuration
   ├── Token validation
@@ -336,7 +336,7 @@ Topic B
 
 Small chunks are used for retrieval, but the larger parent section is returned to the LLM.
 
-```bash
+```plaintext
     Large Parent Document
               │
    ┌──────────┼──────────┐
@@ -353,7 +353,7 @@ The small chunks provide retrieval precision while the parent document provides 
 
 A moving window is used to create overlapping chunks.
 
-```bash
+```plaintext
 Window 1
 ████████
 
@@ -383,7 +383,7 @@ The document's structure is used to determine chunk boundaries.
 
 For example:
 
-```bash
+```plaintext
 # Authentication
     ↓
 Chunk 1
@@ -421,7 +421,7 @@ The right strategy depends on the data.
 
 A production system may combine multiple approaches:
 
-```bash
+```plaintext
 Structure-aware splitting
         +
 Semantic grouping
@@ -431,7 +431,7 @@ Parent document retrieval
 
 You should also experiment with chunk sizes such as:
 
-```bash
+```plaintext
 256 tokens
 512 tokens
 1024 tokens
@@ -465,7 +465,7 @@ Original question:
 
 The system might generate:
 
-```bash
+```plaintext
 What is OAuth token refresh?
 
 How does a refresh token work?
@@ -479,7 +479,7 @@ What is the OAuth refresh-token flow?
 
 Each query is searched independently.
 
-```bash
+```plaintext
                Original Question
                      ↓
                Generate Queries
@@ -500,19 +500,19 @@ Different documents use different terminology.
 
 One document might say:
 
-```bash
+```plaintext
 OAuth token refresh
 ```
 
 while another says:
 
-```bash
+```plaintext
 renewing an expired access token
 ```
 
 and another says:
 
-```bash
+```plaintext
 obtaining a new bearer token using a refresh credential
 ```
 
@@ -562,7 +562,7 @@ But small chunks have a problem:
 
 Consider retrieving this chunk:
 
-```bash
+```plaintext
 "... it automatically retries failed operations ..."
 ```
 
@@ -570,7 +570,7 @@ The chunk might be relevant, but by itself it doesn't tell us what "it" refers t
 
 The original section might say:
 
-```bash
+```plaintext
 "The job processor automatically retries failed operations when a worker temporarily loses access to the message queue."
 ```
 
@@ -580,7 +580,7 @@ The parent document provides the missing context.
 
 #### Step 1: Create small chunks
 
-```bash
+```plaintext
 Document
    ↓
 Chunk 1
@@ -594,7 +594,7 @@ Chunk 4
 
 The vector database retrieves the most relevant chunks.
 
-```bash
+```plaintext
 Top Chunks:
 1
 2
@@ -607,7 +607,7 @@ Top Chunks:
 
 Each chunk stores a reference to its parent section or document.
 
-```bash
+```plaintext
 Chunk 8
    ↓
 Parent Document / Section
@@ -617,7 +617,7 @@ Parent Document / Section
 
 Instead of giving the LLM only the tiny chunk, provide the relevant parent section.
 
-```bash
+```plaintext
 Small chunks → Search
 
 Parent document → Context
@@ -643,7 +643,7 @@ Store a `parent_id` with each chunk.
 
 For example:
 
-```bash
+```plaintext
 Chunk:
 {
   id: "chunk_123",
@@ -678,7 +678,7 @@ This is related to the **lost-in-the-middle** problem: important information can
 
 ### How context compression works
 
-```bash
+```plaintext
 40 Retrieved Chunks
         ↓
      Compress
@@ -709,7 +709,7 @@ Common targets include:
 
 Summarize each chunk into a smaller representation.
 
-```bash
+```plaintext
 Large chunk
     ↓
 1–2 sentence summary
@@ -737,7 +737,7 @@ Suppose retrieval returns 40 chunks.
 
 After compression:
 
-```bash
+```plaintext
 40 chunks
    ↓
 8 chunks
@@ -769,7 +769,7 @@ It addresses a common retrieval problem:
 
 For example:
 
-```bash
+```plaintext
 "message queue retries"
 ```
 
@@ -781,7 +781,7 @@ A better search signal could be a hypothetical answer generated by an LLM.
 
 Instead of embedding the original question:
 
-```bash
+```plaintext
 User Question
      ↓
 Embedding
@@ -791,7 +791,7 @@ Vector Search
 
 HyDE introduces an intermediate generation step:
 
-```bash
+```plaintext
 User Question
      ↓
 Generate Hypothetical Answer
@@ -836,7 +836,7 @@ It is primarily a **search representation**.
 
 The actual answer still comes from retrieved documents.
 
-```bash
+```plaintext
 Question
    ↓
 Hypothetical Answer
@@ -854,7 +854,7 @@ Query expansion usually creates multiple alternative queries.
 
 HyDE generates a hypothetical document or answer and embeds that representation.
 
-```bash
+```plaintext
 Query Expansion
 → Multiple queries
 
@@ -891,7 +891,7 @@ But not every question needs external retrieval.
 
 For example:
 
-```bash
+```plaintext
 What is the square root of 144?
 ```
 
@@ -908,7 +908,7 @@ Always retrieving causes:
 
 Self-RAG introduces a decision step.
 
-```bash
+```plaintext
       User Question
             ↓
    Should I retrieve?
@@ -937,7 +937,7 @@ The model answers using its internal knowledge.
 
 Example:
 
-```bash
+```plaintext
 What is 15 × 8?
 ```
 
@@ -949,7 +949,7 @@ The system retrieves relevant documents.
 
 Example:
 
-```bash
+```plaintext
 What changed in our company's API documentation this week?
 ```
 
@@ -1013,7 +1013,7 @@ CRAG introduces a quality-control step.
 
 ### How CRAG works
 
-```bash
+```plaintext
       User Question
            ↓
    Retrieve Documents
@@ -1066,7 +1066,7 @@ Suppose the user asks:
 
 The retriever returns:
 
-```bash
+```plaintext
 1. Introduction to relational databases
 2. Key-value cache configuration
 3. Columnar database architecture for analytics
@@ -1079,7 +1079,7 @@ The system can then remove weak results and perform additional retrieval if nece
 
 The goal is:
 
-```bash
+```plaintext
 Retrieve
    ↓
 Check
@@ -1115,13 +1115,13 @@ CRAG is particularly useful for:
 
 Normal RAG:
 
-```bash
+```plaintext
 Retrieve → Answer
 ```
 
 CRAG:
 
-```bash
+```plaintext
 Retrieve → Evaluate → Correct → Answer
 ```
 
@@ -1141,7 +1141,7 @@ A production RAG system can combine several of them.
 
 For example:
 
-```bash
+```plaintext
                     User Query
                         │
                         ▼
@@ -1219,7 +1219,7 @@ Each technique solves a different failure mode.
 
 A practical system might start with something relatively simple:
 
-```bash
+```plaintext
 Documents
    ↓
 Structure-Aware Chunking
@@ -1241,25 +1241,25 @@ Then add more advanced techniques only where measurements show they are needed.
 
 For example:
 
-```bash
+```plaintext
 Self-RAG
 ```
 
 can reduce unnecessary retrieval.
 
-```bash
+```plaintext
 Multi-Query Retrieval
 ```
 
 can improve recall for difficult questions.
 
-```bash
+```plaintext
 HyDE
 ```
 
 can help with vague queries.
 
-```bash
+```plaintext
 CRAG
 ```
 
@@ -1271,13 +1271,13 @@ can add a validation and correction loop.
 
 The biggest mistake when building RAG systems is treating retrieval as a single operation:
 
-```bash
+```plaintext
 Query → Vector DB → LLM
 ```
 
 Real-world retrieval is closer to a pipeline of decisions:
 
-```bash
+```plaintext
 Should I retrieve?
         ↓
 What should I search for?

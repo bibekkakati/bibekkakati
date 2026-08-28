@@ -78,7 +78,7 @@ Even with a forced JSON schema, the AI needs strict behavioral boundaries. Propi
 
 Financial data must be exact. The prompt explicitly states:
 
-```bash
+```plaintext
 "Extract only data that is explicitly visible in the document. Never guess, infer, or fabricate values. If a field is missing or unclear, return null for that field."
 ```
 
@@ -93,7 +93,7 @@ Raw OCR data is messy. Dates come in various formats (MM/DD/YY, DD-MMM-YYYY), an
 
 What happens if a user uploads a photo of their cat instead of a receipt? The agent needs an escape hatch.
 
-```bash
+```plaintext
 FAILURE CONDITIONS: If the file is corrupted, blank, unsupported, not readable, or not a financial document, return only: { 'error': 'Seems like file is not a valid document' }
 ```
 
