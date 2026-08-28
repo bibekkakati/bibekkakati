@@ -46,7 +46,7 @@ export default function NavbarIsland() {
                             ${!isOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 pointer-events-none"}
                         `}
                     >
-                        <Compass className="size-5 animate-pulse" />
+                        <Compass className="size-5" />
                     </button>
                 )}
 

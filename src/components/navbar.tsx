@@ -120,7 +120,7 @@ export default function Navbar({
                         <TooltipArrow className="fill-primary" />
                     </TooltipContent>
                 </Tooltip>
-                {onClose && (
+                {/* {onClose && (
                     <>
                         <Separator
                             orientation="vertical"
@@ -135,7 +135,7 @@ export default function Navbar({
                             <X className="size-4" />
                         </button>
                     </>
-                )}
+                )} */}
             </Dock>
         </div>
     );
