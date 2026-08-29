@@ -9,7 +9,7 @@ import { ArrowUpRight } from "lucide-react";
 import React from "react";
 import Markdown from "react-markdown";
 
-const BLUR_FADE_DELAY = 0.01;
+const BLUR_FADE_DELAY = 0.005;
 
 export default function HomePage() {
     const sectionComponents: Record<string, React.ReactNode> = {

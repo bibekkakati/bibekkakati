@@ -2,7 +2,7 @@ import BlurFade from "@/components/magicui/blur-fade";
 import { ProjectCard } from "@/components/project-card";
 import { DATA } from "@/data/resume";
 
-const BLUR_FADE_DELAY = 0.02;
+const BLUR_FADE_DELAY = 0.01;
 
 export default function ProjectsSection() {
     return (
