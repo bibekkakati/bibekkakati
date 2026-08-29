@@ -4,7 +4,7 @@ publishedAt: "2026-08-29"
 updatedAt: "2026-08-29"
 author: "Bibek Kakati"
 summary: "A beginner-friendly guide to Kubernetes: what problem it solves, how its architecture works with real-world analogies, core components, and practical YAML examples."
-image: ""
+image: "/static/kubernetes-architecture.jpeg"
 ---
 
 If you have already explored [Docker](/blog/docker-explained-containers-and-architecture), you know how convenient containers are. You package your application, dependencies, and environment into a neat image, run `docker run`, and it just works.
@@ -67,37 +67,7 @@ A Kubernetes setup is called a **Cluster**. A cluster is made of physical machin
 1. **The Control Plane (The Brain):** Makes high-level decisions, monitors the cluster, and schedules workloads.
 2. **Worker Nodes (The Muscle):** The actual machines that run your containerized applications.
 
-```plaintext
-+-------------------------------------------------------------------------+
-|                              CONTROL PLANE                              |
-|                                                                         |
-|   +-------------------+   +--------------------+   +----------------+   |
-|   |  kube-apiserver   |   |        etcd        |   | kube-scheduler |   |
-|   +-------------------+   +--------------------+   +----------------+   |
-|             |                                                           |
-|   +-------------------------+   +-----------------------------------+   |
-|   | kube-controller-manager |   |      cloud-controller-manager     |   |
-|   +-------------------------+   +-----------------------------------+   |
-+------------------------------------+------------------------------------+
-                                     |
-              +----------------------+----------------------+
-              |                                             |
-+-------------v---------------+               +-------------v---------------+
-|         WORKER NODE 1       |               |         WORKER NODE 2       |
-|                             |               |                             |
-|  +-----------------------+  |               |  +-----------------------+  |
-|  |        kubelet        |  |               |  |        kubelet        |  |
-|  +-----------------------+  |               |  +-----------------------+  |
-|  +-----------------------+  |               |  +-----------------------+  |
-|  |      kube-proxy       |  |               |  |      kube-proxy       |  |
-|  |   (Network Router)    |  |               |  |   (Network Router)    |  |
-|  +-----------------------+  |               |  +-----------------------+  |
-|  +-----------------------+  |               |  +-----------------------+  |
-|  |   Container Runtime   |  |               |  |   Container Runtime   |  |
-|  |   [ Pod ]   [ Pod ]   |  |               |  |   [ Pod ]   [ Pod ]   |  |
-|  +-----------------------+  |               |  +-----------------------+  |
-+-----------------------------+               +-----------------------------+
-```
+![Kubernetes Architecture](/static/kubernetes-architecture.jpeg)
 
 ### The Control Plane Components
 
