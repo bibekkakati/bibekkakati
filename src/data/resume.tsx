@@ -44,7 +44,7 @@ export const DATA = {
     description:
         "Software Engineer who enjoys taking ownership, moving fast, and building scalable products from zero to growth.",
     summary: [
-        "I'm a Software Engineer with 5+ years of experience building scalable [backend systems and full-stack AI applications](#work). I've worked across logistics, travel, and AI, with experience in distributed systems, cloud infrastructure, and system design.",
+        "I'm a Software Engineer with 5+ years of experience building scalable [backend systems and full-stack AI applications](#work). I've worked across domains, and AI, with experience in distributed systems, cloud infrastructure, and system design.",
         "Most recently, I was a [Founding Engineer](/#work) at a travel-tech startup, where I owned large parts of the engineering stack from architecture to product delivery. I enjoy solving complex backend problems and building reliable systems that scale.",
     ],
     avatarUrl: "/picofme.jpeg",

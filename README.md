@@ -1,6 +1,6 @@
 ## Hi, I'm Bibek 👋
 
-Software Engineer with 5+ years of experience building scalable backend and distributed systems across logistics, travel, and AI. Experienced in system architecture, databases, distributed workflows, caching, and high-performance services, with a track record of owning production systems end-to-end and leading cross-functional engineering teams.
+Software Engineer with 5+ years of experience building scalable backend and distributed systems across domains, and AI. Experienced in system architecture, databases, distributed workflows, caching, and high-performance services, with a track record of owning production systems end-to-end and leading cross-functional engineering teams.
 
 Previously built products from scratch as a founding engineer and enjoy solving complex engineering problems involving scale, reliability, and system design.
 
