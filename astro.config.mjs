@@ -1,4 +1,5 @@
 // @ts-check
+import { unified } from '@astrojs/markdown-remark';
 import mdx from '@astrojs/mdx';
 import react from '@astrojs/react';
 import sitemap from '@astrojs/sitemap';
@@ -20,7 +21,7 @@ export default defineConfig({
   integrations: [
     react(),
     mdx({
-      remarkPlugins: [remarkGfm, remarkCodeMeta],
+      processor: unified({ remarkPlugins: [remarkGfm, remarkCodeMeta] }),
       shikiConfig: {
         themes: {
           light: "dracula-soft",
@@ -33,7 +34,7 @@ export default defineConfig({
   ],
 
   markdown: {
-    remarkPlugins: [remarkGfm, remarkCodeMeta],
+    processor: unified({ remarkPlugins: [remarkGfm, remarkCodeMeta] }),
     shikiConfig: {
       themes: {
         light: "dracula-soft",
