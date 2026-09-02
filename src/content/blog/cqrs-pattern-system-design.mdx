@@ -4,7 +4,7 @@ publishedAt: "2026-09-02"
 updatedAt: "2026-09-02"
 author: "Bibek Kakati"
 summary: "CQRS (Command Query Responsibility Segregation) is an architectural pattern that separates read and write operations, allowing each to be optimized independently for performance and scalability."
-image: ""
+image: "/static/cqrs-flow-diagram.webp"
 ---
 
 In traditional software architectures, we almost instinctively reach for the CRUD (Create, Read, Update, Delete) paradigm. We design an entity model, map it to a relational schema using an ORM, and use that identical abstraction to both alter state and display data on user dashboards.
@@ -29,29 +29,7 @@ At its philosophical core:
 - **Command (Write):** Represents an intent to alter domain state (e.g., `SubmitOrder`, `DeactivateUser`, `ChangeBillingAddress`). A command should focus entirely on domain logic, data integrity, and business rules. In strict CQRS, commands do not return domain data — only an acknowledgment, validation failure, or generated entity ID.
 - **Query (Read):** Retrieves data without mutating application state (e.g., `GetOrderSummaryById`, `ListCustomerInvoices`). Queries should execute side-effect-free operations that return lightweight Data Transfer Objects (DTOs).
 
-```
-         ┌────────────────────────────────────────────────────────┐
-         │                       Client                           │
-         └─────────────┬────────────────────────────▲─────────────┘
-                       │                            │
-             Execute Command                    Run Query
-                       │                            │
-                       ▼                            │
-         ┌───────────────────────────┐  ┌───────────┴─────────────┐
-         │       Command Model       │  │       Query Model       │
-         │ (Validation & Invariants) │  │   (Optimized for DTOs)  │
-         └─────────────┬─────────────┘  └───────────▲─────────────┘
-                       │                            │
-                 Mutates State                Direct Read
-                       │                            │
-                       ▼                            │
-         ┌───────────────────────────┐  ┌───────────┴─────────────┐
-         │       Write Storage       │──|    Synchronization      │
-         └───────────────────────────┘  │   (Sync / Async CDC)    │
-                                        └─────────────────────────┘
-```
-
----
+![CQRS](/static/cqrs-flow-diagram.webp)
 
 ## 2. How CQRS Works in Practice
 
